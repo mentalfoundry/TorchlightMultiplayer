@@ -252,3 +252,12 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   0x4E4410 -> 0x4E4110 (MeshManager::getSingleton, remove) took 2-17 s on floors with ~100 monsters
   (found by sampling the game thread during saves). Stand-ins are therefore only taken off the level
   for a save (RemoveUnit / AddUnit), never destroyed and rebuilt.
+
+## Open: rare crash in the unit activity check (2026-10-28)
+- Once in many runs (handover, host returning from town to a floor the client ran): access violation at
+  0x526C6E (HasTag 0x480760 <- 0x48BDF0 activity check <- 0x4F7340 <- CLevel::Update 0x4F8B20) on a
+  freed unit still in a level list, 0.7 s after the client's stand-in and pet copy were spawned.
+  Not reproduced in three reruns. Suspects: a unit we free (release / removePuppet / equip's removed
+  items) that is still in an update list RemoveUnit doesn't clear (+0x60?).
+- Symbolize TLMP.dll frames with DbgHelp (SymFromAddr against build\RelWithDebInfo\TLMP.pdb, base
+  0x6D310000 as the crash log shows it).

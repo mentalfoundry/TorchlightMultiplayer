@@ -36,6 +36,7 @@ public:
     std::function<void(uint8_t slot, const std::string& text)> onChat;
     std::function<void(uint8_t slot, const PlayerInfo& info)> onPlayerInfo;
     std::function<void(uint32_t seed)> onWorldSeed; // client only; 0 = host gone
+    std::function<void(float healthPerPlayer)> onPartyRules; // client only: the host's party settings
     // Message types the session itself doesn't handle, for game modules. The reader is
     // positioned just after the type byte. On a client, fromSlot is always 0 (the host).
     std::function<void(uint8_t fromSlot, Msg type, Reader& r)> onGameMessage;
@@ -56,6 +57,8 @@ public:
 
   // Host only: call when the host character's world seed is known or changes.
   void sendWorldSeed(uint32_t seed);
+  // Host: party settings every client follows (sent along with the world seed).
+  void setPartyRules(float healthPerPlayer) { m_healthPerPlayer = healthPerPlayer; }
 
   bool isHost() const { return m_mode == NetMode::Host; }
   bool isConnected() const { return m_localSlot != kInvalidSlot; }
@@ -80,6 +83,7 @@ private:
   std::string m_localName;
   PlayerInfo m_localInfo;
   uint32_t m_worldSeed = 0; // host: last announced; 0 = unknown
+  float m_healthPerPlayer = 0.5f;
   _ENetHost* m_host = nullptr;
   _ENetPeer* m_server = nullptr; // client only
   uint8_t m_localSlot = kInvalidSlot;

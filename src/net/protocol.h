@@ -15,7 +15,7 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 25;
+constexpr uint16_t kProtocolVersion = 27;
 constexpr int kMaxPlayers = 4;
 constexpr uint8_t kInvalidSlot = 0xFF;
 constexpr int kEquipSlots = 12; // CInventory slots 0..11 are the equipment slots
@@ -38,7 +38,8 @@ enum class Msg : uint8_t
   Chat,         // both: slot, text
   PlayerInfo,   // both: slot, PlayerInfo -- reliable, sent on change; host relays and
                 // replays all known infos to a newly welcomed client
-  WorldSeed,    // H->C: u32 host character's world seed (client+0xFB0); sent on welcome
+  WorldSeed,    // H->C: u32 host character's world seed (client+0xFB0), f32 party rule: monster health
+                //       per extra player; sent on welcome
                 // and on change. Clients adopt it so floors generate identically.
 
   // Host-authoritative monsters (game/monsters.cpp). All carry the host's levelId first;

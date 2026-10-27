@@ -1,0 +1,14 @@
+# Party size: with two players in the game the host's monsters have x1.5 health (the default +50%
+# per extra player), and the client's copies show the same; when the client leaves, back to x1.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+expect monsterscale 1.5 timeout=20
+wait 2
+sync dump timeout=60
+dump scaled
+sync leave timeout=60
+expect monsterscale 1 timeout=30
+dump alone
+quit

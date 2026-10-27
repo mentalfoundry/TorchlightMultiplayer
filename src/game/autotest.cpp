@@ -828,6 +828,19 @@ Poll expectCheck(const Step& s, std::string& why)
       return fired == 0 ? Poll::Done : Poll::Fail;
     return (want == "fired" ? fired > 0 : waiting) ? Poll::Done : Poll::Wait;
   }
+  if (what == "monsterscale") // monsterscale <x>: every monster this machine runs has party multiplier x
+  {
+    float lo = 0.0f, hi = 0.0f, want = floatArg(s, 2, 1.0f);
+    if (!monsters::scaleRange(&lo, &hi))
+    {
+      why = "no monsters run here";
+      return Poll::Wait;
+    }
+    char b[64];
+    std::snprintf(b, sizeof(b), "multipliers %.2f..%.2f", lo, hi);
+    why = b;
+    return std::fabs(lo - want) < 0.01f && std::fabs(hi - want) < 0.01f ? Poll::Done : Poll::Wait;
+  }
   if (what == "looks") // every copy here has its owner's look (names, champions, health)
   {
     unsigned n = monsters::copiesWithoutLook();
@@ -976,6 +989,11 @@ Poll run(const Step& s, bool begin, std::string& why)
   if (cmd == "sync")
   {
     const std::string& name = s.args.size() > 1 ? s.args[1] : std::string("?");
+    if (mySlot() >= net::kMaxPlayers)
+    {
+      why = "not connected"; // no slot (the session is gone): nobody to meet
+      return Poll::Fail;
+    }
     if (begin)
     {
       g_syncSeen[mySlot()].insert(name);

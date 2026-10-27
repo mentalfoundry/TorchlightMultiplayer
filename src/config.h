@@ -18,6 +18,7 @@ struct Config
   std::string address = "127.0.0.1"; // client: host to connect to
   uint16_t port = 27960;
   std::string playerName = "Adventurer";
+  float healthPerPlayer = 0.5f; // host: monster health added per player beyond the first ([party])
   uint32_t devWorldSeed = 0; // -tlmp-worldseed N: act as if a host sent N (testing only)
   std::wstring repairPetType;  // -tlmp-repairpet <Type> <Name>: give a pet-less character its pet back
   std::wstring repairPetName;

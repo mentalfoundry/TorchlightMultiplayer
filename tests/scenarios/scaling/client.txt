@@ -1,0 +1,12 @@
+# Party size (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+wait 4
+sync dump timeout=60
+expect looks timeout=30
+dump scaled
+sync leave timeout=60
+quit

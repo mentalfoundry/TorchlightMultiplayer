@@ -194,6 +194,7 @@ static void start()
   cb.onPlayerState = [](uint8_t slot, const net::PlayerState& st) { game::onRemoteState(slot, st); };
   cb.onPlayerInfo = [](uint8_t slot, const net::PlayerInfo& info) { game::onRemoteInfo(slot, info); };
   cb.onWorldSeed = [](uint32_t seed) { game::onHostWorldSeed(seed); };
+  cb.onPartyRules = [](float healthPerPlayer) { game::monsters::setHealthPerPlayer(healthPerPlayer); };
   cb.onGameMessage = [](uint8_t from, net::Msg type, net::Reader& r) { dispatch(from, type, r); };
   game::monsters::attach(&g_session);
   game::floor::attach(&g_session);
@@ -210,6 +211,9 @@ static void start()
     game::showChat(game::displayName(slot, g_session.player(slot).name), text);
   };
   game::setChatSender([](const std::string& text) { g_session.sendChat(text); });
+  g_session.setPartyRules(g_config.healthPerPlayer);
+  if (g_config.mode == NetMode::Host)
+    game::monsters::setHealthPerPlayer(g_config.healthPerPlayer);
   g_session.start(g_config, std::move(cb));
   game::autotest::start(&g_session, g_config.testScript);
 }

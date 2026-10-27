@@ -76,6 +76,9 @@ open and close while tests run; avoid typing during a run (the game reads some k
   same way: missiles, effects and summoned minions show up for everyone. Those casts are for show;
   damage only comes from your own game. Your minions are kept like your pet: everyone sees them
   where they are, with their health, and monsters that hit them hurt your real minions.
+- **Party size.** Monsters get +50% health for each player in the game beyond the first (x1.5 for
+  two, x2.5 for four), adjusted as players join and leave. The host sets it in `TLMP.ini`
+  (`[party] monster_health_per_player`, 0 = off); everyone plays by the host's setting.
 - **Death.** Each player gets their own death screen.
 - **Quests** stay in each player's own save: anyone can take any quest their save allows, whatever floor
   the session is on. A quest's monsters are created by the machine running the floor for everyone; one
@@ -96,7 +99,7 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Monster groups waking near remote players, quest targets for late arrivals, hardcore deaths, 4 players | done, rig-tested |
 | Skills and spells on other machines (cast for show by the player's stand-in), summons | done, rig-tested |
 | Summoned minions in sync (copies follow the real ones; hits on copies reach the real minion) | done, rig-tested |
-| Party difficulty scaling | not started |
+| Party difficulty scaling (monster health per player, host setting) | done, rig-tested |
 | Stand-in stats (remote players are level-1 characters wearing the real gear) | not started |
 | Town portals and waypoints for other players | not started |
 | Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |

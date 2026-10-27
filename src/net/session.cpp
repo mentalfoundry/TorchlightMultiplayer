@@ -298,6 +298,9 @@ void Session::handlePacket(ENetPeer* peer, const uint8_t* data, size_t size)
       uint32_t seed = r.u32();
       if (r.ok() && m_cb.onWorldSeed)
         m_cb.onWorldSeed(seed);
+      float healthPerPlayer = r.f32();
+      if (r.ok() && m_cb.onPartyRules)
+        m_cb.onPartyRules(healthPerPlayer);
       break;
     }
     case Msg::PlayerInfo:
@@ -373,6 +376,7 @@ void Session::hostOnHello(ENetPeer* peer, Reader& r)
   {
     Writer ws(Msg::WorldSeed);
     ws.u32(m_worldSeed);
+    ws.f32(m_healthPerPlayer);
     send(peer, ws, kChanReliable, true);
   }
   for (uint8_t s = 0; s < kMaxPlayers; s++)
@@ -475,6 +479,7 @@ void Session::sendWorldSeed(uint32_t seed)
   TLMP_LOG("net: announcing world seed %u", seed);
   Writer w(Msg::WorldSeed);
   w.u32(seed);
+  w.f32(m_healthPerPlayer);
   broadcast(w, kChanReliable, true, kInvalidSlot);
 }
 

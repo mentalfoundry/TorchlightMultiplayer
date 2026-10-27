@@ -136,7 +136,9 @@ static void petCensus(engine::Level* level, const char* side)
 
 static bool g_spawningPuppet = false; // our own AddUnit calls
 
-static bool captureMonster(engine::Unit* u, std::vector<uint8_t>& out)
+// `scale`: the party health multiplier already in its health (travels with it, so whoever builds
+// it knows not to apply it again).
+static bool captureMonster(engine::Unit* u, std::vector<uint8_t>& out, float scale = 1.0f)
 {
   void* state = savestate::create(engine::kCharStateSize, engine::CharStateCtor);
   if (!state)
@@ -144,16 +146,19 @@ static bool captureMonster(engine::Unit* u, std::vector<uint8_t>& out)
   engine::virtualFn<void(__thiscall*)(void*, void*)>(u, engine::kCharCaptureSlot)(u, state);
   bool ok = savestate::toBytes(state, engine::CharStateWrite, out);
   savestate::destroy(state);
-  // The state doesn't carry the rolled maximum health (each new unit rolls its own): append it.
-  int base[2] = {engine::field<int>(u, engine::kUnitBaseHealth), engine::field<int>(u, engine::kUnitBonusHealth)};
-  const auto* b = reinterpret_cast<const uint8_t*>(base);
-  out.insert(out.end(), b, b + sizeof(base));
+  // The state doesn't carry the rolled maximum health (each new unit rolls its own): append it,
+  // and the multiplier in it.
+  int trailer[3] = {engine::field<int>(u, engine::kUnitBaseHealth), engine::field<int>(u, engine::kUnitBonusHealth), 0};
+  std::memcpy(&trailer[2], &scale, sizeof(float));
+  const auto* b = reinterpret_cast<const uint8_t*>(trailer);
+  out.insert(out.end(), b, b + sizeof(trailer));
   return ok;
 }
 
 // Builds the monster a saved state describes (champion name and bonuses, equipment and all) and
 // puts it in the level at `pos`, in the floor loader's order (0x413F84): create, AddUnit, restore.
-static engine::Unit* createFromState(const std::vector<uint8_t>& bytes, engine::Level* level, const Vec3& pos)
+static engine::Unit* createFromState(const std::vector<uint8_t>& bytes, engine::Level* level, const Vec3& pos,
+                                     float* scale = nullptr)
 {
   uintptr_t client = gameClient();
   void* resources = client ? engine::field<void*>(reinterpret_cast<void*>(client), engine::kClientResources) : nullptr;
@@ -161,13 +166,15 @@ static engine::Unit* createFromState(const std::vector<uint8_t>& bytes, engine::
   if (!state)
     return nullptr;
   engine::Unit* unit = nullptr;
-  if (bytes.size() <= 8)
+  int base[3];
+  if (bytes.size() <= sizeof(base))
   {
     savestate::destroy(state);
     return nullptr;
   }
-  int base[2];
   std::memcpy(base, bytes.data() + bytes.size() - sizeof(base), sizeof(base));
+  if (scale)
+    std::memcpy(scale, &base[2], sizeof(float));
   std::vector<uint8_t> saved(bytes.begin(), bytes.end() - sizeof(base));
   if (savestate::fromBytes(state, engine::CharStateRead, *reinterpret_cast<const uint32_t*>(engine::kCharStateVersion),
                            saved))
@@ -204,12 +211,58 @@ struct Tracked
   int level = 1;
   Vec3 spawn{};
   bool deathSent = false;
+  float scale = 1.0f; // party health multiplier applied to it (see scaleNow)
 };
 
 static engine::Level* g_hostLevel = nullptr;
 static uint32_t g_nextId = 1;
 static std::unordered_map<uint32_t, Tracked> g_tracked;
 static std::unordered_map<engine::Unit*, uint32_t> g_trackedIds;
+
+// --- party size ---------------------------------------------------------------------------------
+// Monsters on a floor get more health for every player in the game beyond the first (the host's
+// setting, sent with the world seed; 0 = off). The owner applies it to its monsters and keeps it in
+// step as players come and go (health keeps its share of the maximum); copies show the result.
+static float g_healthPerPlayer = 0.5f;
+static bool g_fullStateDue = false; // after a rescale: every copy needs its new maximum, near or far
+
+void setHealthPerPlayer(float perPlayer)
+{
+  if (perPlayer < 0.0f)
+    perPlayer = 0.0f;
+  if (perPlayer != g_healthPerPlayer)
+    TLMP_LOG("monsters: monster health +%.0f%% per extra player", perPlayer * 100.0f);
+  g_healthPerPlayer = perPlayer;
+}
+
+static int playersInGame()
+{
+  int n = 0;
+  for (uint8_t s = 0; s < net::kMaxPlayers; s++)
+    n += floor::slotInGame(s) ? 1 : 0;
+  return n < 1 ? 1 : n;
+}
+
+static float scaleNow()
+{
+  return 1.0f + g_healthPerPlayer * static_cast<float>(playersInGame() - 1);
+}
+
+// Max health is (base + bonus) scaled by stats, plus a flat stat: scaling base and bonus scales it.
+static void rescale(Tracked& t, float to)
+{
+  if (!t.unit || to <= 0.0f || std::fabs(to - t.scale) < 0.001f)
+    return;
+  float f = to / t.scale;
+  auto* base = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(t.unit) + engine::kUnitBaseHealth);
+  auto* bonus = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(t.unit) + engine::kUnitBonusHealth);
+  auto* health = reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(t.unit) + engine::kUnitHealth);
+  *base = static_cast<int>(std::lround(*base * f));
+  *bonus = static_cast<int>(std::lround(*bonus * f));
+  if (!isDead(t.unit))
+    *health = *health * f;
+  t.scale = to;
+}
 static float g_nextRoster = 0.0f;
 static float g_nextState = 0.0f;
 static uint32_t g_looksSent[net::kMaxPlayers] = {}; // level each slot has all looks for
@@ -248,9 +301,10 @@ static void hostScan(engine::Level* level)
     uint32_t id = g_nextId++;
     g_trackedIds[unit] = id;
     g_tracked[id] = Tracked{unit, guidOf(unit), engine::field<int>(unit, engine::kUnitLevel), unitPosition(unit), false};
+    rescale(g_tracked[id], scaleNow());
     // Others on the floor build their copy from this (champions look like champions).
     std::vector<uint8_t> look;
-    if (anyoneElseHere(levelId(level)) && captureMonster(unit, look))
+    if (anyoneElseHere(levelId(level)) && captureMonster(unit, look, g_tracked[id].scale))
     {
       net::Writer w(Msg::MonsterLook);
       writeLook(w, levelId(level), id, look);
@@ -262,6 +316,17 @@ static void hostScan(engine::Level* level)
   {
     if (!present.count(it->second.unit))
     {
+      // Gone from the level between two scans (some monsters vanish as they die): if nobody was
+      // told it died, it did -- its copies go too, and players near it get their share.
+      if (!it->second.deathSent)
+      {
+        TLMP_LOG("monsters: [owner] monster %u (%016llx) left the floor without dying here: reported dead", it->first,
+                 it->second.guid);
+        net::Writer w(Msg::MonsterDied);
+        w.u32(levelId(level));
+        w.u32(it->first);
+        floor::sendToFloor(w, true);
+      }
       g_trackedIds.erase(it->second.unit);
       it = g_tracked.erase(it);
       continue;
@@ -310,7 +375,7 @@ static void hostSendState(engine::Level* level)
 
     std::vector<uint32_t> ids;
     for (const auto& [id, t] : g_tracked)
-      if (!t.deathSent && distXZ(unitPosition(t.unit), at) <= kStateRadius)
+      if (!t.deathSent && (g_fullStateDue || distXZ(unitPosition(t.unit), at) <= kStateRadius))
         ids.push_back(id);
     if (ids.empty())
       continue;
@@ -324,10 +389,13 @@ static void hostSendState(engine::Level* level)
       w.u32(id);
       writeVec(w, unitPosition(u));
       w.f32(engine::field<float>(u, engine::kUnitHealth));
+      w.u32(static_cast<uint32_t>(engine::GetMaxHealth(u)));
+      w.f32(g_tracked[id].scale);
       w.u8(static_cast<uint8_t>(aiState(u)));
     }
-    floor::sendTo(slot, w, false);
+    floor::sendTo(slot, w, g_fullStateDue); // the full one must arrive
   }
+  g_fullStateDue = false;
 }
 
 static void report(const char* fmt, ...);
@@ -344,6 +412,26 @@ static void hostTick()
     return;
 
   float now = clock();
+  static float nextScale = 0.0f;
+  if (now >= nextScale)
+  {
+    nextScale = now + 1.0f;
+    float to = scaleNow();
+    unsigned changed = 0;
+    for (auto& [id, t] : g_tracked)
+    {
+      if (t.deathSent || std::fabs(t.scale - to) < 0.001f)
+        continue;
+      rescale(t, to);
+      changed++;
+    }
+    if (changed)
+    {
+      g_fullStateDue = true;
+      TLMP_LOG("monsters: [owner] %d player(s) in the game: monster health x%.2f (%u monsters adjusted)",
+               playersInGame(), to, changed);
+    }
+  }
   if (now >= g_nextState)
   {
     g_nextState = now + kStateInterval;
@@ -361,7 +449,7 @@ static void hostTick()
       for (const auto& [id, t] : g_tracked)
       {
         std::vector<uint8_t> look;
-        if (t.deathSent || hasDied(t.unit) || !captureMonster(t.unit, look))
+        if (t.deathSent || hasDied(t.unit) || !captureMonster(t.unit, look, t.scale))
           continue;
         net::Writer w(Msg::MonsterLook);
         writeLook(w, lid, id, look);
@@ -369,6 +457,9 @@ static void hostTick()
         sent++;
       }
       TLMP_LOG("monsters: sent slot %u the looks of %u monsters", slot, sent);
+      // A newcomer may hold copies made otherwise (e.g. kept from running the floor itself for a
+      // moment): the next state goes out for every monster, with the maxima.
+      g_fullStateDue = true;
     }
   }
   if (now >= g_nextRoster)
@@ -394,6 +485,8 @@ struct Mirror
   bool hasState = false;
   Vec3 target{};
   float health = 0.0f;
+  uint32_t maxHealth = 0; // the owner's (0 = not heard yet)
+  float scale = 1.0f;     // party health multiplier the owner applied
   bool dead = false;
 
   std::vector<uint8_t> look; // the monster as the owner's game saves it
@@ -436,7 +529,7 @@ static void spawnPuppet(uint32_t id, Mirror& m, engine::Level* level)
   engine::Unit* unit = nullptr;
   if (!m.look.empty())
   {
-    unit = createFromState(m.look, level, pos);
+    unit = createFromState(m.look, level, pos, &m.scale);
     m.look.clear(); // used (and never again: a respawned copy would be a new id)
     m.fromLook = unit != nullptr;
     if (!unit)
@@ -553,7 +646,10 @@ static void clientTick()
     }
     if (!m.hasState)
       continue;
-    *reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(m.puppet.unit) + engine::kUnitHealth) = m.health;
+    if (m.maxHealth)
+      applyVitals(m.puppet.unit, m.health, m.maxHealth); // the owner's maximum too (party size)
+    else
+      *reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(m.puppet.unit) + engine::kUnitHealth) = m.health;
     steer(m.puppet, m.target);
   }
 }
@@ -632,6 +728,8 @@ static void onState(net::Reader& r)
     uint32_t id = r.u32();
     Vec3 pos = readVec(r);
     float health = r.f32();
+    uint32_t maxHealth = r.u32();
+    float scale = r.f32();
     uint8_t ai = r.u8();
     if (!r.ok())
       break;
@@ -641,6 +739,8 @@ static void onState(net::Reader& r)
     it->second.hasState = true;
     it->second.target = pos;
     it->second.health = health;
+    it->second.maxHealth = maxHealth;
+    it->second.scale = scale;
     if (ai == engine::kAIStateDying || ai == engine::kAIStateDead)
       it->second.dead = true;
   }
@@ -897,9 +997,10 @@ void writeSnapshot(net::Writer& w)
     w.u8(dead ? 1 : 0);
     writeVec(w, unitPosition(t.unit));
     w.f32(engine::field<float>(t.unit, engine::kUnitHealth));
+    w.f32(t.scale);
     std::vector<uint8_t> state;
     if (!dead)
-      captureMonster(t.unit, state);
+      captureMonster(t.unit, state, t.scale);
     w.bytes(state);
   }
 }
@@ -925,6 +1026,7 @@ void becomeOwner(net::Reader* r)
     bool dead;
     Vec3 pos;
     float health;
+    float scale;
     std::vector<uint8_t> state;
   };
   std::unordered_map<uint32_t, Entry> snap;
@@ -943,6 +1045,7 @@ void becomeOwner(net::Reader* r)
       e.dead = r->u8() != 0;
       e.pos = readVec(*r);
       e.health = r->f32();
+      e.scale = r->f32();
       e.state = r->bytes();
       if (r->ok())
         snap[id] = std::move(e);
@@ -957,7 +1060,7 @@ void becomeOwner(net::Reader* r)
     if (!m.puppet.unit)
       continue;
     kept.insert(m.puppet.unit);
-    tracked[id] = Tracked{m.puppet.unit, m.guid, m.level, m.hostSpawn, m.dead || isDead(m.puppet.unit)};
+    tracked[id] = Tracked{m.puppet.unit, m.guid, m.level, m.hostSpawn, m.dead || isDead(m.puppet.unit), m.scale};
   }
   g_mirrors.clear();
   g_puppets.clear();
@@ -998,6 +1101,16 @@ void becomeOwner(net::Reader* r)
       }
       else if (!e.dead)
       {
+        // The snapshot's maximum (its state's trailer: base, bonus, multiplier) with its health: a
+        // copy kept here may have been built from the type alone, with a roll of its own.
+        int trailer[3];
+        if (e.state.size() > sizeof(trailer))
+        {
+          std::memcpy(trailer, e.state.data() + e.state.size() - sizeof(trailer), sizeof(trailer));
+          *reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(u) + engine::kUnitBaseHealth) = trailer[0];
+          *reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(u) + engine::kUnitBonusHealth) = trailer[1];
+          std::memcpy(&it->second.scale, &trailer[2], sizeof(float));
+        }
         *reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(u) + engine::kUnitHealth) = e.health;
         if (distXZ(unitPosition(u), e.pos) > 1.5f)
           engine::setPosition(u, e.pos);
@@ -1019,7 +1132,7 @@ void becomeOwner(net::Reader* r)
       g_spawningPuppet = false;
     }
     *reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(u) + engine::kUnitHealth) = e.health;
-    tracked[id] = Tracked{u, e.guid, e.level, e.pos, false};
+    tracked[id] = Tracked{u, e.guid, e.level, e.pos, false, e.scale}; // its state carries the scaled health
     spawned++;
   }
 
@@ -1093,6 +1206,20 @@ void discardOwn()
   g_trackedIds.clear();
   g_hostLevel = nullptr;
   TLMP_LOG("monsters: dropped my own %u monsters; this floor is run elsewhere", n);
+}
+
+bool scaleRange(float* lo, float* hi)
+{
+  bool any = false;
+  for (const auto& [id, t] : g_tracked)
+  {
+    if (!t.unit || t.deathSent)
+      continue;
+    *lo = any ? std::min(*lo, t.scale) : t.scale;
+    *hi = any ? std::max(*hi, t.scale) : t.scale;
+    any = true;
+  }
+  return any;
 }
 
 unsigned copiesWithoutLook()
