@@ -1,0 +1,17 @@
+# Waypoints (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+mark
+sync near timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+dump floor4
+sync floor4 timeout=60
+sync town timeout=90
+expect dungeon
+sync end timeout=60
+quit

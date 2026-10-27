@@ -104,7 +104,7 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Stand-in level and base stats (so monsters' hit rolls use the real defenses) | done, rig-tested |
 | Stand-in passive skills and active buffs | not started |
 | Town portals for other players (shown where cast; anyone can use one to go to town) | done, rig-tested |
-| Waypoints between dungeon floors as party trips | built on the travel rules, not yet tested |
+| Waypoints (to another floor: a party trip; to town: alone) | done, rig-tested |
 | Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).

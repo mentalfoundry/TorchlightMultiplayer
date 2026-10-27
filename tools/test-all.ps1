@@ -29,6 +29,7 @@ $suite = [ordered]@{
   minions     = @()
   scaling     = @('scaled')
   portal      = @()
+  waypoint    = @('floor4')
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

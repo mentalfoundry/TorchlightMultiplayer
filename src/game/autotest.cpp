@@ -1524,6 +1524,17 @@ Poll run(const Step& s, bool begin, std::string& why)
     changeLevel(L"Town", -99);
     return Poll::Done;
   }
+  if (cmd == "waypoint" && s.args.size() > 2)
+  {
+    // Test only: as the waypoint menu does (0x5B6481): ChangeLevel(dungeon, 0, floor, waypoint 1, "", 0).
+    void* client = reinterpret_cast<void*>(gameClient());
+    if (!client)
+      return Poll::Fail;
+    std::wstring dungeon = fromUtf8(s.args[1]);
+    reinterpret_cast<engine::ChangeLevelFn>(engine::kChangeLevel)(client, vs::make(dungeon.c_str()), 0, intArg(s, 2), 1,
+                                                                  vs::make(L""), 0);
+    return Poll::Done;
+  }
   if (cmd == "stairs")
   {
     changeLevel(L"", s.args.size() > 1 && s.args[1] == "up" ? -1 : 1);
