@@ -1271,14 +1271,19 @@ void showMessage(const std::string& text, float seconds)
   showChat("TLMP", text, chat::Kind::System);
 }
 
+uint32_t localLevelId()
+{
+  return levelId(currentLevel());
+}
+
 bool playing()
 {
   return inGameplay();
 }
 
-void showHostLeft()
+void showHostLeft(const std::string& text)
 {
-  showNotice("The host has left the game. You are playing on your own now.", 8.0f);
+  showMessage(text, 8.0f);
 }
 
 void endSession()

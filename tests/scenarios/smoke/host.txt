@@ -9,6 +9,9 @@ wait 8
 dump start
 shot start
 expect avatar 1
+expect party D2| timeout=10
+expect party |100| timeout=10
+expect mapmarker 1 timeout=10
 expect owner 0
 sync checked timeout=60
 quit

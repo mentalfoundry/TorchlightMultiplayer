@@ -9,6 +9,7 @@ sync start timeout=60
 sync died timeout=60
 expect notice has died timeout=20
 expect avatardead 1 timeout=20
+expect party |0|dead timeout=10
 wait 8
 shot clientdead
 dump clientdead
@@ -16,6 +17,7 @@ expect alive
 sync revived timeout=180
 expect avatar 1 timeout=30
 expect notice is back timeout=30
+expect party |100| timeout=30
 dump revived
 sync end timeout=60
 quit

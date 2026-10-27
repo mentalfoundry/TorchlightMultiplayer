@@ -35,6 +35,8 @@ $suite = [ordered]@{
   menu        = @()
   corpses     = @()
   chat        = @()
+  reconnect   = @()
+  reconnectfail = @()
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

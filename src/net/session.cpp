@@ -6,6 +6,32 @@
 
 namespace tlmp::net {
 
+namespace {
+
+constexpr uint32_t kReconnectFor = 60000;   // ms after a drop: then the session is over
+constexpr uint32_t kFirstAttempt = 1000;    // ms after the drop
+constexpr uint32_t kAttemptInterval = 3000; // ms between attempts
+// A peer that doesn't acknowledge for this long is gone (ENet's defaults are 5 s / 30 s). Loading a
+// floor blocks the game thread for seconds, with nothing polled; when both ends had just loaded,
+// the 5 s minimum dropped connections that were fine.
+constexpr uint32_t kTimeoutMinimum = 20000;
+constexpr uint32_t kTimeoutMaximum = 45000;
+
+uint32_t g_dropIncomingUntil = 0; // test: GetTickCount until which nothing is received
+
+int ENET_CALLBACK interceptIncoming(ENetHost*, ENetEvent*)
+{
+  return g_dropIncomingUntil && static_cast<int32_t>(g_dropIncomingUntil - GetTickCount()) > 0 ? 1 : 0;
+}
+
+} // namespace
+
+void Session::dropIncomingFor(float seconds)
+{
+  g_dropIncomingUntil = GetTickCount() + static_cast<uint32_t>(seconds * 1000.0f);
+  TLMP_LOG("net: [test] receiving nothing for %.0f s", seconds);
+}
+
 uint32_t gameBuildStamp()
 {
   auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
@@ -40,6 +66,7 @@ bool Session::start(const Config& cfg, Callbacks callbacks)
       TLMP_LOG("net: failed to listen on port %u", cfg.port);
       return false;
     }
+    m_slotTokens = {};
     m_localSlot = 0;
     m_players[0].active = true;
     m_players[0].name = m_localName;
@@ -60,6 +87,13 @@ bool Session::start(const Config& cfg, Callbacks callbacks)
       return false;
     }
     addr.port = cfg.port;
+    m_serverHost = addr.host;
+    m_serverPort = addr.port;
+    m_token = GetTickCount() ^ (GetCurrentProcessId() << 16) ^ static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this));
+    if (!m_token)
+      m_token = 1;
+    m_reconnecting = false;
+    m_rejected = false;
     m_server = enet_host_connect(m_host, &addr, kChanCount, 0);
     TLMP_LOG("net: connecting to %s:%u as '%s'", cfg.address.c_str(), cfg.port, m_localName.c_str());
   }
@@ -71,7 +105,7 @@ void Session::stop()
   if (!m_host)
     return;
   for (size_t i = 0; i < m_host->peerCount; i++)
-    enet_peer_disconnect_now(&m_host->peers[i], 0);
+    enet_peer_disconnect_now(&m_host->peers[i], kGoodbye);
   enet_host_flush(m_host);
   enet_host_destroy(m_host);
   m_host = nullptr;
@@ -79,6 +113,7 @@ void Session::stop()
   m_localSlot = kInvalidSlot;
   m_players = {};
   m_mode = NetMode::Off;
+  m_reconnecting = false;
   enet_deinitialize();
 }
 
@@ -86,6 +121,21 @@ void Session::poll()
 {
   if (!m_host)
     return;
+  m_host->intercept = interceptIncoming;
+
+  // After a drop: try the host again every few seconds (a connect that fails comes back as a
+  // disconnect, handleDisconnect).
+  if (m_reconnecting && !m_server && static_cast<int32_t>(GetTickCount() - m_nextAttempt) >= 0)
+  {
+    ENetAddress addr{};
+    addr.host = m_serverHost;
+    addr.port = m_serverPort;
+    m_server = enet_host_connect(m_host, &addr, kChanCount, 0);
+    TLMP_LOG("net: reconnecting to the host (%lu s left)",
+             static_cast<unsigned long>((m_reconnectUntil - GetTickCount()) / 1000));
+    if (!m_server)
+      m_nextAttempt = GetTickCount() + kAttemptInterval;
+  }
 
   ENetEvent ev;
   while (enet_host_service(m_host, &ev, 0) > 0)
@@ -96,7 +146,7 @@ void Session::poll()
         handleConnect(ev.peer);
         break;
       case ENET_EVENT_TYPE_DISCONNECT:
-        handleDisconnect(ev.peer);
+        handleDisconnect(ev.peer, ev.data);
         break;
       case ENET_EVENT_TYPE_RECEIVE:
         handlePacket(ev.peer, ev.packet->data, ev.packet->dataLength);
@@ -110,6 +160,7 @@ void Session::poll()
 
 void Session::handleConnect(ENetPeer* peer)
 {
+  enet_peer_timeout(peer, 0, kTimeoutMinimum, kTimeoutMaximum);
   if (m_mode == NetMode::Client)
   {
     TLMP_LOG("net: connected to host, sending hello");
@@ -118,17 +169,18 @@ void Session::handleConnect(ENetPeer* peer)
     w.u16(kProtocolVersion);
     w.u32(gameBuildStamp());
     w.str(m_localName);
+    w.u32(m_token);
     send(peer, w, kChanReliable, true);
   }
   // Host: wait for Hello before assigning a slot.
   peer->data = nullptr;
 }
 
-void Session::handleDisconnect(ENetPeer* peer)
+void Session::handleDisconnect(ENetPeer* peer, uint32_t data)
 {
   if (m_mode == NetMode::Client)
   {
-    TLMP_LOG("net: disconnected from host");
+    bool wasConnected = m_localSlot != kInvalidSlot;
     for (uint8_t s = 0; s < kMaxPlayers; s++)
     {
       if (m_players[s].active && s != m_localSlot && m_cb.onPlayerLeft)
@@ -137,16 +189,56 @@ void Session::handleDisconnect(ENetPeer* peer)
     m_players = {};
     m_localSlot = kInvalidSlot;
     m_server = nullptr;
-    if (m_cb.onWorldSeed)
-      m_cb.onWorldSeed(0); // no host any more: fall back to our own world
-    if (m_cb.onHostLost)
-      m_cb.onHostLost();
+    if (data == kGoodbye)
+    {
+      TLMP_LOG("net: the host ended the session");
+      giveUp(HostLost::Left);
+    }
+    else if (m_rejected)
+      giveUp(HostLost::Rejected);
+    else if (wasConnected)
+    {
+      // Lost, not ended: keep the host's world (seed, floors) and try to get back in.
+      TLMP_LOG("net: lost the connection to the host; reconnecting for up to %u s", kReconnectFor / 1000);
+      m_reconnecting = true;
+      m_reconnectUntil = GetTickCount() + kReconnectFor;
+      m_nextAttempt = GetTickCount() + kFirstAttempt;
+      if (m_cb.onConnectionLost)
+        m_cb.onConnectionLost();
+    }
+    else if (m_reconnecting && static_cast<int32_t>(GetTickCount() - m_reconnectUntil) < 0)
+      m_nextAttempt = GetTickCount() + kAttemptInterval; // that attempt failed; another soon
+    else if (m_reconnecting)
+    {
+      TLMP_LOG("net: could not reconnect to the host");
+      giveUp(HostLost::Dropped);
+    }
+    else
+    {
+      TLMP_LOG("net: could not connect to the host");
+      giveUp(HostLost::Unreachable);
+    }
     return;
   }
 
   uint8_t slot = slotForPeer(peer);
   if (slot == kInvalidSlot)
     return;
+  dropSlot(slot);
+}
+
+void Session::giveUp(HostLost why)
+{
+  m_reconnecting = false;
+  if (m_cb.onWorldSeed)
+    m_cb.onWorldSeed(0); // no host any more: fall back to our own world
+  if (m_cb.onHostLost)
+    m_cb.onHostLost(why);
+}
+
+// Host: a player is gone (left, timed out, or replaced by their own reconnection).
+void Session::dropSlot(uint8_t slot)
+{
   TLMP_LOG("net: slot %u ('%s') left", slot, m_players[slot].name.c_str());
   m_players[slot] = {};
   if (m_cb.onPlayerLeft)
@@ -245,12 +337,20 @@ void Session::handlePacket(ENetPeer* peer, const uint8_t* data, size_t size)
       TLMP_LOG("net: welcomed as slot %u", m_localSlot);
       if (!m_localInfo.className.empty())
         sendPlayerInfo(m_localInfo); // became known before we were welcomed
+      if (m_reconnecting)
+      {
+        m_reconnecting = false;
+        TLMP_LOG("net: reconnected to the host");
+        if (m_cb.onReconnected)
+          m_cb.onReconnected();
+      }
       break;
     }
     case Msg::Reject:
     {
       auto reason = static_cast<RejectReason>(r.u8());
       TLMP_LOG("net: rejected by host (reason %u)", static_cast<unsigned>(reason));
+      m_rejected = true;
       break;
     }
     case Msg::PlayerJoined:
@@ -327,6 +427,7 @@ void Session::hostOnHello(ENetPeer* peer, Reader& r)
   uint16_t version = r.u16();
   uint32_t stamp = r.u32();
   std::string name = r.str();
+  uint32_t token = r.u32();
   if (!r.ok() || magic != kMagic || version != kProtocolVersion)
   {
     reject(peer, RejectReason::BadVersion);
@@ -338,15 +439,33 @@ void Session::hostOnHello(ENetPeer* peer, Reader& r)
     return;
   }
 
+  // A player coming back after a drop gets their old slot. If the host hasn't noticed the drop yet,
+  // the old connection is let go of first.
   uint8_t slot = kInvalidSlot;
-  for (uint8_t s = 1; s < kMaxPlayers; s++)
+  for (uint8_t s = 1; s < kMaxPlayers && token; s++)
   {
-    if (!m_players[s].active)
+    if (m_slotTokens[s] != token)
+      continue;
+    if (m_players[s].active && m_players[s].peer && m_players[s].peer != peer)
     {
-      slot = s;
-      break;
+      TLMP_LOG("net: '%s' is back on a new connection; dropping the old one", m_players[s].name.c_str());
+      ENetPeer* old = m_players[s].peer;
+      old->data = nullptr;
+      dropSlot(s);
+      enet_peer_reset(old);
     }
+    if (!m_players[s].active)
+      slot = s;
+    break;
   }
+  // Otherwise a free slot, preferring ones nobody has had (theirs may come back).
+  for (int pass = 0; pass < 2 && slot == kInvalidSlot; pass++)
+    for (uint8_t s = 1; s < kMaxPlayers; s++)
+      if (!m_players[s].active && (pass == 1 || m_slotTokens[s] == 0))
+      {
+        slot = s;
+        break;
+      }
   if (slot == kInvalidSlot)
   {
     reject(peer, RejectReason::Full);
@@ -358,6 +477,7 @@ void Session::hostOnHello(ENetPeer* peer, Reader& r)
   m_players[slot].active = true;
   m_players[slot].name = name;
   m_players[slot].peer = peer;
+  m_slotTokens[slot] = token;
   peer->data = reinterpret_cast<void*>(static_cast<uintptr_t>(slot + 1));
   TLMP_LOG("net: '%s' joined as slot %u", name.c_str(), slot);
 

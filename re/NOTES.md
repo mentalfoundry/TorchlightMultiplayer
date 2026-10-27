@@ -272,3 +272,27 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   the once-a-second activity pass 0x4F7340 walks.
 - Symbolize TLMP.dll frames with DbgHelp (SymFromAddr against build\RelWithDebInfo\TLMP.pdb, base
   0x6D310000 as the crash log shows it).
+
+## Input, automap (2026-10-28)
+- Keys: the window procedure (0x40DE20) gives each message to CEGUI first (GameUI 0x53FE70:
+  injectKeyDown/Up/Char; '~' with Shift held is not injected) and then to CKeyManager::OnMessage
+  0x4E7120 (CGameClient+0x240): down +0x909[vk], pressed/released edges +0x709/+0xB09, moved to
+  +0x9/+0x409 each frame by 0x4E7220. Hotkeys poll pressed 0x4E71B0 / down 0x4E71D0 / released
+  0x4E7200; there is no "someone is typing" check of the game's own to reuse.
+- Developer console: CConsole at GameUI+0x13EC (made by 0x572250), its frame at +0xC; console.layout
+  is loaded with a random name prefix (WindowsLook/Console/Editbox etc.).
+- Automap: CLevel+0x160 (built by 0x4EBD40). Icons are billboards: "bb" set at +0x10 (dynamic),
+  "bbstatic" at +0x14; AddIcon 0x4EBB40 thiscall(automap, icon, Vector3* pos, Vector3* facing, bool,
+  bool) ret 0x14, icons 1..34 from media/sharedtextures/automap.dds (0x11 purple orb = player,
+  0x10 orange orb = pet). The player's billboard is +0x40 (moved by 0x4EA540, which also uncovers
+  the map), the pet's +0x44 (0x4EA440; 0x4EA410 hides it at (x 0xA921A4, y 0xAA98E0)). 0x4F18D0
+  rebuilds tag-based icons (NPCs, vendors, quest givers: tags 0x7F 0x82 0x86 0x85 0x84 0x29 0x83 ->
+  billboard at unit+0x668); 0x4EB360 removes only the icons made with the flags set. Stand-ins have
+  none of those tags, so other players were not on the map.
+
+## Network timeouts (2026-10-28)
+- ENet's default peer timeout (5 s minimum) dropped healthy connections when both ends had just loaded
+  a floor (the game thread is blocked for seconds while loading, nothing polled). Peers now use
+  20 s / 45 s (session.cpp). The host's deliberate disconnect carries kGoodbye; anything else is a
+  lost connection, which the client retries for a minute (Hello carries a per-run token, so the host
+  gives the slot back, dropping the stale connection if it hasn't timed out yet).

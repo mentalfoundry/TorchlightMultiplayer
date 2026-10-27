@@ -1,0 +1,17 @@
+# A client's connection drops (see client.txt): the host lets it go and takes it back, in its old
+# slot, without anything else happening on the host's side.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync back timeout=300
+expect avatar 1 timeout=30
+expect samelevel 1 timeout=30
+expect owner 0 timeout=30
+expect chat still here timeout=30
+keys {enter}
+expect typing timeout=5
+keys welcome back
+keys {enter}
+sync end timeout=60
+quit

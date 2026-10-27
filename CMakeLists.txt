@@ -38,10 +38,12 @@ add_library(TLMP SHARED
   src/game/skills.cpp
   src/game/minions.cpp
   src/game/levelguard.cpp
+  src/game/minimap.cpp
   src/net/upnp.cpp
   src/menu.cpp
   src/cegui.cpp
   src/chat.cpp
+  src/hud.cpp
   src/game/triggers.cpp
   src/game/party.cpp
   src/game/hooks.cpp

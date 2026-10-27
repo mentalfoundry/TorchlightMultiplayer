@@ -618,6 +618,11 @@ void onPlayerLeft(uint8_t slot)
   }
 }
 
+void onReconnected()
+{
+  g_lastSent = Location{};
+}
+
 void endSession()
 {
   g_snapshots.clear();

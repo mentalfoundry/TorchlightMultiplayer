@@ -1,0 +1,24 @@
+# A dropped connection: the client receives nothing for 50 s, so both ends time out (a silent peer is given up after 20-45 s). It is told,
+# the others leave its screen, and it reconnects on its own -- into its old slot, on the party's
+# floor, with chat working again.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+wait 3
+netdrop 50
+expect notice Reconnecting timeout=100
+expect noavatar 0 timeout=10
+expect notice Reconnected to the host timeout=120
+expect avatar 0 timeout=60
+expect samelevel 0 timeout=60
+sync back timeout=60
+expect owner 0 timeout=30
+keys {enter}
+expect typing timeout=5
+keys still here
+keys {enter}
+expect chat welcome back timeout=30
+sync end timeout=60
+quit

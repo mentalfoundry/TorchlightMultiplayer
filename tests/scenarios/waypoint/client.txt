@@ -9,6 +9,9 @@ mark
 sync near timeout=60
 expect newlevel timeout=60
 expect samelevel 0 timeout=60
+# The host's monsters reach us a moment after we arrive.
+expect monsters 50 timeout=30
+expect looks timeout=30
 dump floor4
 sync floor4 timeout=60
 sync town timeout=90

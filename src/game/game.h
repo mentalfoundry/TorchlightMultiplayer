@@ -48,7 +48,10 @@ bool onConsoleLine(const wchar_t* line);
 void enableConsoleForSession();
 void endSession();
 // Client: tells the player the host has gone (the session ended; this game goes on alone).
-void showHostLeft();
+// The session with the host is over (as a notice and in the chat box).
+void showHostLeft(const std::string& text);
+// Id of the level this machine is on (0 if none), as PlayerState.levelId carries it.
+uint32_t localLevelId();
 // A message for the player: on screen for `seconds`, and in the chat (console) history.
 void showMessage(const std::string& text, float seconds);
 // In a game (not on the title screen or loading).

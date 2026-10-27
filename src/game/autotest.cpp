@@ -1,6 +1,7 @@
 #include "game/autotest.h"
 #include "cegui.h"
 #include "chat.h"
+#include "hud.h"
 #include "game/anim.h"
 #include "game/diag.h"
 #include "game/engine.h"
@@ -11,6 +12,7 @@
 #include "game/monsters.h"
 #include "game/party.h"
 #include "game/minions.h"
+#include "game/minimap.h"
 #include "game/skills.h"
 #include "game/spawns.h"
 #include "game/triggers.h"
@@ -990,6 +992,29 @@ Poll expectCheck(const Step& s, std::string& why)
         c = '|';
     return got.find(want) != std::string::npos ? Poll::Done : Poll::Wait;
   }
+  if (what == "mapmarker" && s.args.size() > 2) // mapmarker <slot>: their minimap marker is on their stand-in
+  {
+    uint8_t slot = static_cast<uint8_t>(std::atoi(s.args[2].c_str()));
+    engine::Unit* u = avatarOf(slot);
+    Vec3 at{};
+    if (!u || !minimap::markerAt(slot, &at))
+    {
+      why = u ? "no marker" : "no stand-in";
+      return Poll::Wait;
+    }
+    float d = distXZ(at, unitPosition(u));
+    why = "marker " + std::to_string(d) + " from the stand-in";
+    return d < 1.5f ? Poll::Done : Poll::Wait;
+  }
+  if (what == "party" && s.args.size() > 2) // party <text>: the party frames show it (name|level|health %|note)
+  {
+    std::string want = restFrom(s, 2), got = hud::shownText();
+    why = "'" + got + "'";
+    for (char& c : why)
+      if (c == '\n')
+        c = '/';
+    return got.find(want) != std::string::npos ? Poll::Done : Poll::Wait;
+  }
   if (what == "typing" || what == "nottyping") // the chat box's input line is open / closed
   {
     why = chat::typing() ? "typing" : "not typing";
@@ -1442,6 +1467,13 @@ Poll run(const Step& s, bool begin, std::string& why)
     char b[64];
     std::snprintf(b, sizeof(b), "to (%.1f, %.1f)", x, z);
     why = b;
+    return Poll::Done;
+  }
+  if (cmd == "netdrop" && s.args.size() > 1)
+  {
+    // Test only: this machine's network goes away for that many seconds (nothing is received, so
+    // both ends time out as with a real drop).
+    net::Session::dropIncomingFor(floatArg(s, 1, 10.0f));
     return Poll::Done;
   }
   if ((cmd == "focus" || cmd == "unfocus") && s.args.size() > 1)

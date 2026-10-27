@@ -28,7 +28,9 @@ address for friends on your own network. The game also asks your router to open 
 (UPnP). If your router doesn't do UPnP, it tells you so:
 forward UDP 27960 to your PC in the router's settings, and give friends your public IP. (A VPN such
 as Tailscale or ZeroTier also works: join with the host's VPN address.) If the host leaves, everyone
-else is told and keeps playing on their own; they can join again later.
+else is told and keeps playing on their own; they can join again later. If your connection drops
+(noticed after 20-45 s without a word from the host), the game tells you and reconnects by itself for
+up to a minute: you get your old place back and are taken to the party's floor.
 
 `TLMP.ini` in the game folder or these flags can also start a session directly:
 
@@ -95,6 +97,9 @@ open and close while tests run; avoid typing during a run (the game reads some k
   two, x2.5 for four), adjusted as players join and leave. The host sets it in `TLMP.ini`
   (`[party] monster_health_per_player`, 0 = off); everyone plays by the host's setting.
 - **Death.** Each player gets their own death screen.
+- **Party frames and map.** Under your pet's portrait (top left) every other player has a frame: name,
+  level and a health bar, greyed out while they're dead, with a note when they're in town, on another
+  floor or loading. On the minimap and map, players on your floor are blue orbs (you are the purple one).
 - **Quests** stay in each player's own save: anyone can take any quest their save allows, whatever floor
   the session is on. A quest's monsters are created by the machine running the floor for everyone; one
   target per quest, and one kill counts for every player holding that quest nearby.
@@ -121,6 +126,8 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Waypoints (to another floor: a party trip; to town: alone) | done, rig-tested |
 | Title-screen Host/Join menu, host leaving ends the session cleanly | done, rig-tested |
 | In-game chat box (Enter to type; hotkeys held off while typing) | done, rig-tested |
+| Reconnecting after a dropped connection (old slot back, party floor) | done, rig-tested |
+| Party frames (name, level, health, where); other players on the minimap | done, rig-tested |
 | Internet play: UPnP port opening, manual forwarding fallback | built; not tested on a UPnP router or over the internet |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).

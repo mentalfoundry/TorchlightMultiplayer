@@ -15,8 +15,11 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 29;
+constexpr uint16_t kProtocolVersion = 30;
 constexpr int kMaxPlayers = 4;
+// Disconnect data the host sends when it ends the session on purpose (leaving or quitting). Any
+// other disconnect is a lost connection, which clients try to get back (Session::poll).
+constexpr uint32_t kGoodbye = 0x45594242; // "BBYE"
 constexpr uint8_t kInvalidSlot = 0xFF;
 constexpr int kEquipSlots = 12; // CInventory slots 0..11 are the equipment slots
 
@@ -29,7 +32,8 @@ enum Channel : uint8_t
 
 enum class Msg : uint8_t
 {
-  Hello = 1,    // C->H: magic, version, exeStamp, name
+  Hello = 1,    // C->H: magic, version, exeStamp, name, token (random per game run: a player
+                //       reconnecting is given their old slot back)
   Welcome,      // H->C: yourSlot, [slot, name]...
   Reject,       // H->C: reason string, then disconnect
   PlayerJoined, // H->C: slot, name

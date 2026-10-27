@@ -7,6 +7,7 @@
 #include "game/quests.h"
 #include "game/levelguard.h"
 #include "game/minions.h"
+#include "game/minimap.h"
 #include "game/skills.h"
 #include "game/spawns.h"
 #include "game/monsters.h"
@@ -37,6 +38,7 @@ static void __fastcall levelDtorHook(void* self, void* edx)
   game::monsters::onLevelDestroyed(self);
   game::loot::onLevelDestroyed(self);
   game::minions::onLevelDestroyed(self);
+  game::minimap::onLevelDestroyed(self);
   game::onLevelDestroyed(self);
   g_levelDtor(self, edx);
 }

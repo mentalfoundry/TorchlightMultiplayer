@@ -41,6 +41,8 @@ void tick();
 void onMessage(uint8_t fromSlot, net::Msg type, net::Reader& r);
 void onPlayerLeft(uint8_t slot);
 void endSession();
+// Client: back in the session after a dropped connection (reports where we are again).
+void onReconnected();
 
 // --- this machine's role -------------------------------------------------------------------
 // True when this machine runs `level` (or, without a session, always).

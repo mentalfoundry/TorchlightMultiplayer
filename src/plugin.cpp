@@ -10,6 +10,7 @@
 #include "game/loot.h"
 #include "game/quests.h"
 #include "game/minions.h"
+#include "game/minimap.h"
 #include "game/skills.h"
 #include "game/spawns.h"
 #include "game/game.h"
@@ -22,6 +23,7 @@
 #include "net/upnp.h"
 #include "menu.h"
 #include "chat.h"
+#include "hud.h"
 #include "game/levelguard.h"
 #include "ogre_abi.h"
 #include "profile.h"
@@ -39,6 +41,8 @@ constexpr float kStateSendInterval = 1.0f / 20.0f;
 
 static void upnpReport();
 
+static void hudTick();
+
 class NetFrameListener final : public ogre_abi::FrameListener
 {
 public:
@@ -50,6 +54,8 @@ public:
     upnpReport();
     menu::tick();
     chat::tick();
+    hudTick();
+    game::minimap::tick(g_session.isActive());
     game::floor::tick();
     game::monsters::tick();
     game::combat::tick();
@@ -147,6 +153,40 @@ private:
 };
 
 static NetFrameListener g_frameListener;
+
+// The party frames (hud.h): everyone else in the session, from their latest PlayerState.
+static void hudTick()
+{
+  std::vector<hud::Member> members;
+  bool show = g_session.isActive() && game::playing();
+  if (show)
+  {
+    uint32_t here = game::localLevelId();
+    for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
+    {
+      const net::RemotePlayer& p = g_session.player(slot);
+      if (slot == g_session.localSlot() || !p.active)
+        continue;
+      hud::Member m;
+      m.slot = slot;
+      m.name = game::displayName(slot, p.name);
+      m.where = hud::Member::Where::Loading;
+      if (p.hasState)
+      {
+        m.level = p.state.level;
+        m.health = p.state.health;
+        m.maxHealth = p.state.maxHealth;
+        m.dead = p.state.dead;
+        if (p.state.inGame && p.state.levelId)
+          m.where = p.state.levelId == here                    ? hud::Member::Where::Here
+                    : game::floor::isTownLevel(p.state.levelId) ? hud::Member::Where::Town
+                                                                : hud::Member::Where::Elsewhere;
+      }
+      members.push_back(std::move(m));
+    }
+  }
+  hud::tick(show, members);
+}
 
 static bool attachToOgre()
 {
@@ -254,6 +294,8 @@ static std::string sessionStatus()
       line += " If friends can't connect, forward UDP " + port + " to this PC on your router.";
     return line;
   }
+  if (g_session.isReconnecting())
+    return "Co-op: lost the connection; reconnecting to " + g_config.address + "...";
   if (!g_session.isConnected())
     return "Co-op: connecting to " + g_config.address + "...";
   std::snprintf(b, sizeof(b), "Co-op: joined %s, %d player(s)", g_config.address.c_str(), g_session.playerCount());
@@ -302,13 +344,33 @@ static void start()
   cb.onPlayerState = [](uint8_t slot, const net::PlayerState& st) { game::onRemoteState(slot, st); };
   cb.onPlayerInfo = [](uint8_t slot, const net::PlayerInfo& info) { game::onRemoteInfo(slot, info); };
   cb.onWorldSeed = [](uint32_t seed) { game::onHostWorldSeed(seed); };
-  cb.onHostLost = [] {
+  cb.onHostLost = [](net::HostLost why) {
     // The session is over: this game goes on alone. What the floor shows becomes its own (copies
     // get their AI back once we're no client), others' dropped items leave, settings are ours again.
     game::endSession();
     game::loot::endSession();
     game::floor::endSession();
-    game::showHostLeft();
+    switch (why)
+    {
+    case net::HostLost::Left:
+      game::showHostLeft("The host has left the game. You are playing on your own now.");
+      break;
+    case net::HostLost::Dropped:
+      game::showHostLeft("Could not reconnect to the host. You are playing on your own now.");
+      break;
+    case net::HostLost::Unreachable:
+      game::showHostLeft("Could not connect to the host.");
+      break;
+    case net::HostLost::Rejected:
+      game::showHostLeft("The host turned the connection down (game full, or a different TLMP or game version).");
+      break;
+    }
+  };
+  // A dropped connection: the others leave our screen until we're back (Session::poll retries).
+  cb.onConnectionLost = [] { game::showMessage("Lost the connection to the host. Reconnecting...", 6.0f); };
+  cb.onReconnected = [] {
+    game::floor::onReconnected();
+    game::showMessage("Reconnected to the host.", 4.0f);
   };
   cb.onPartyRules = [](float healthPerPlayer) { game::monsters::setHealthPerPlayer(healthPerPlayer); };
   cb.onGameMessage = [](uint8_t from, net::Msg type, net::Reader& r) { dispatch(from, type, r); };

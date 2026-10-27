@@ -1,0 +1,13 @@
+# A connection that doesn't come back: the client receives nothing for good, tries to reconnect for
+# a minute, then gives up and plays on alone.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+wait 3
+netdrop 300
+expect notice Reconnecting timeout=100
+expect notice Could not reconnect timeout=90
+expect noavatar 0
+quit
