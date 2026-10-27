@@ -54,17 +54,45 @@ Scenarios live in `tests\scenarios\<name>\host.txt` / `client.txt`. Tests use th
 (client) under `<game>\tlmp_profiles`, whose saves are reset from `tlmp_profiles\_test_seed` before every run;
 the real profiles are never touched. Two game windows open and close while tests run.
 
+## How co-op plays
+
+- **Floors.** Everyone shares one dungeon floor, generated identically from the host's world seed (your
+  own seed stays in your save). Leaving a floor waits until every player in the game is at the exit,
+  then counts down; a softcore player who is dead must resurrect first. Hardcore-dead players and those
+  on the title screen don't count (they stay connected and can come back with another character).
+- **Town** trips are always allowed alone; everyone in town is in the same town. Going back down puts
+  you on the party's floor.
+- **Who runs a floor.** The host's machine simulates the floor it is on; if the host is in town or on
+  the title screen, the lowest-numbered player on the floor takes over (monsters, doors and events are
+  handed over), so the dungeon keeps running.
+- **Events.** Scripted trigger areas outside town fire only once everyone in the game is together
+  (within about 15 units), with "waiting for ..." messages on screen.
+- **Combat.** Hits go to the machine running the floor; XP and fame are shared within 50 units.
+  Monsters, champions included, are exact copies on every machine (names, health, positions).
+- **Loot.** Each player rolls their own loot for every kill they share in (often nothing, as in single
+  player). Items a player drops are shared: whoever picks one up first gets it.
+- **Death.** Each player gets their own death screen.
+- **Quests** stay in each player's own save: anyone can take any quest their save allows, whatever floor
+  the session is on. A quest's monsters are created by the machine running the floor for everyone; one
+  target per quest, and one kill counts for every player holding that quest nearby.
+
 ## Status / roadmap
 
-| Milestone | State |
+| Area | State |
 |---|---|
-| 0. Mod loader, logging, config, ENet session (handshake, slots, relay), per-instance profiles | **done, tested with 2 local instances** |
-| 1a. Read local player position/orientation | **done** (`CGame[0xC1AD64]+0x64 → +0x2C → +0x58 node`) |
-| 1b. Remote avatars + pets: spawned via the game's factories, walked with click-to-move, survive level changes | **done, tested in town and dungeon** |
-| 1c. Polish: character/pet names, equipment appearance (by item GUID), idle facing, chat | **done; offline-tested (mirror mode), needs in-game test** |
-| 2. Shared level: clients adopt the host's world seed so floors generate identically (own seed kept in saves) | **done, user-verified in dungeon** |
-| 3. Host-authoritative world: host spawns everything (remote players registered as players there); clients refuse their own hostile spawns and show puppets of the host's monsters; doors/levers/portals are requests the host performs; party travel (map changes wait until everyone is at the exit; clients join the host's floor after Continue) | **built, smoke-tested; needs in-game test** |
-| 4. Combat & skills: client input → host simulation → replicated effects | |
-| 5. Loot, gold, items, quests, waypoints, town portals | |
+| Loader, logging, config, ENet session (host relays), per-instance profiles | done |
+| Remote players and pets (names, gear appearance), chat | done, user-verified |
+| Shared floors (host world seed), party travel, town rules, floor handover | done, rig-tested |
+| Monsters run by the floor's owner, exact copies (incl. champions), doors/levers | done, rig-tested |
+| Combat, shared XP/fame, health bars, animations, per-player death screens | done, rig-tested |
+| Loot: per-player kill loot, shared player drops | done, rig-tested |
+| Quests: per-save quests, shared targets and kill credit | done, rig-tested |
+| Party-wide trigger events with waiting messages | built, not yet tested |
+| Monster groups waking near remote players, quest targets for late arrivals, hardcore deaths, 3-4 players | built, not yet tested |
+| Skills/spells effects and summoned minions on other machines | not started |
+| Party difficulty scaling | not started |
+| Stand-in stats (remote players are level-1 characters wearing the real gear) | not started |
+| Town portals and waypoints for other players | not started |
+| Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).
