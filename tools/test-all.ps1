@@ -30,6 +30,7 @@ $suite = [ordered]@{
   scaling     = @('scaled')
   portal      = @()
   waypoint    = @('floor4')
+  passives    = @('skills')
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

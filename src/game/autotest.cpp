@@ -18,6 +18,7 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -471,6 +472,29 @@ bool slotActive(uint8_t s)
 
 // --- dumps ---------------------------------------------------------------------------------------
 
+// Invested skills (level > 0), "name:level", sorted: as stand-ins get them (PlayerInfo).
+static std::string skillsJson(engine::Unit* u)
+{
+  std::vector<std::string> list;
+  void* mgr = engine::field<void*>(u, engine::kCharSkillManager);
+  void** skills = mgr ? engine::field<void**>(mgr, engine::kSkillManagerSkills) : nullptr;
+  uint32_t count = mgr ? engine::field<uint32_t>(mgr, engine::kSkillManagerSkills + 4) : 0;
+  for (uint32_t i = 0; skills && i < count && i < 128; i++)
+  {
+    void* sk = skills[i];
+    int level = sk ? engine::field<int>(sk, 0xA4) : 0;
+    auto* data = sk ? engine::field<uint8_t*>(sk, 0x5C) : nullptr;
+    wchar_t name[96] = {};
+    if (level > 0 && data && diag::readWString(reinterpret_cast<uintptr_t>(data) + 0xCC, name, 96))
+      list.push_back(toUtf8(name) + ":" + std::to_string(level));
+  }
+  std::sort(list.begin(), list.end());
+  std::string out = ",\"skillLevels\":[";
+  for (size_t i = 0; i < list.size(); i++)
+    out += (i ? ",\"" : "\"") + jsonEscape(list[i]) + "\"";
+  return out + "]";
+}
+
 // Level and base stats, as stand-ins get them (PlayerState).
 static std::string statsJson(engine::Unit* u)
 {
@@ -525,7 +549,7 @@ void dump(const std::string& tag)
     Vec3 p = unitPosition(m);
     o << ",\"me\":{\"x\":" << p.x << ",\"z\":" << p.z << ",\"health\":" << engine::field<float>(m, engine::kUnitHealth)
       << ",\"max\":" << engine::GetMaxHealth(m) << ",\"xp\":" << myXp() << ",\"dead\":" << (isDeadUnit(m) ? "true" : "false")
-      << ",\"items\":" << backpackItems() << ",\"name\":\"" << jsonEscape(unitName(m)) << "\"" << statsJson(m) << "}";
+      << ",\"items\":" << backpackItems() << ",\"name\":\"" << jsonEscape(unitName(m)) << "\"" << statsJson(m) << skillsJson(m) << "}";
   }
   if (engine::Unit* m = me())
   {
@@ -557,7 +581,7 @@ void dump(const std::string& tag)
       Vec3 p = unitPosition(a);
       o << ",\"x\":" << p.x << ",\"z\":" << p.z << ",\"health\":" << engine::field<float>(a, engine::kUnitHealth)
         << ",\"max\":" << engine::GetMaxHealth(a) << ",\"dead\":" << (isDeadUnit(a) ? "true" : "false") << ",\"name\":\""
-        << jsonEscape(unitName(a)) << "\"" << statsJson(a);
+        << jsonEscape(unitName(a)) << "\"" << statsJson(a) << skillsJson(a);
     }
     o << ",\"pet\":" << (pet ? "true" : "false") << "}";
   }
@@ -695,6 +719,30 @@ void dump(const std::string& tag)
           }
         }
         o << "]}";
+      }
+    }
+  }
+  o << "],\"skills\":[";
+  if (engine::Unit* m = me())
+  {
+    // Diagnostics: the skill manager's array at +0x3C (count +0x40?), names and levels.
+    void* mgr = engine::field<void*>(m, engine::kCharSkillManager);
+    uint32_t data = 0, count = 0;
+    if (mgr && diag::readU32(reinterpret_cast<uintptr_t>(mgr) + 0x3C, data) &&
+        diag::readU32(reinterpret_cast<uintptr_t>(mgr) + 0x40, count))
+    {
+      for (uint32_t i = 0; data && i < count && i < 64; i++)
+      {
+        uint32_t sk = 0, lvlData = 0;
+        wchar_t name[96] = {};
+        if (!diag::readU32(data + i * 4, sk) || !sk)
+          continue;
+        diag::readU32(sk + 0x5C, lvlData);
+        if (lvlData)
+          diag::readWString(lvlData + 0xCC, name, 96);
+        uint32_t lvl = 0;
+        diag::readU32(sk + 0xA4, lvl);
+        o << (i ? "," : "") << "{\"name\":\"" << jsonEscape(toUtf8(name)) << "\",\"level\":" << static_cast<int32_t>(lvl) << "}";
       }
     }
   }
@@ -1430,6 +1478,20 @@ Poll run(const Step& s, bool begin, std::string& why)
     engine::TakeDamage(copy, level, &src, floatArg(s, 2, 5.0f), &dir, 0.0f, monster, 1, 1, 0, 0, 0);
     return Poll::Done;
   }
+  if (cmd == "skilllevel" && s.args.size() > 2)
+  {
+    // Test only: skilllevel <level> <name...>: invest in a skill of ours as a skill point does.
+    std::string name = restFrom(s, 2);
+    vs::WString w = vs::make(fromUtf8(name).c_str());
+    void* mgr = engine::field<void*>(m, engine::kCharSkillManager);
+    void* skill = mgr ? engine::FindSkillByName(mgr, &w) : nullptr;
+    vs::destroy(&w);
+    why = name;
+    if (!skill)
+      return Poll::Fail;
+    engine::SetSkillLevel(mgr, skill, intArg(s, 1));
+    return Poll::Done;
+  }
   if (cmd == "learnskill" && s.args.size() > 1)
   {
     // Test only: learn a skill by name (e.g. learnskill Summon Imp) and put it on the right button.
@@ -1681,7 +1743,7 @@ void tick()
   if (p == Poll::Wait)
     return;
   bool check = s.args[0] == "expect" || s.args[0] == "pickup" || s.args[0] == "killnear" || s.args[0] == "teleport" ||
-               s.args[0] == "skill" || s.args[0] == "learnskill";
+               s.args[0] == "skill" || s.args[0] == "learnskill" || s.args[0] == "skilllevel";
   if (p == Poll::Fail)
   {
     g_failed++;

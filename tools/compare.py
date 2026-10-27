@@ -94,6 +94,9 @@ def main():
                     continue
                 ok = abs(a["health"] - me["health"]) <= HEALTH_TOLERANCE * max(me["max"], 1) and a["max"] == me["max"]
                 report(ok, f"[{tag}] {p}'s stand-in for slot {a['slot']}: health {a['health']:.0f}/{a['max']} vs real {me['health']:.0f}/{me['max']}")
+                if "skillLevels" in a and "skillLevels" in me:
+                    report(a["skillLevels"] == me["skillLevels"],
+                           f"[{tag}] {p}'s stand-in for slot {a['slot']}: invested skills {a['skillLevels']} vs real {me['skillLevels']}")
                 if "stats" in a and "stats" in me:
                     report(a["stats"] == me["stats"],
                            f"[{tag}] {p}'s stand-in for slot {a['slot']}: level and stats {a['stats']} vs real {me['stats']}")

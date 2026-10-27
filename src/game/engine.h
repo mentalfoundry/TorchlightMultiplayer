@@ -340,6 +340,16 @@ inline const auto SetTargetUnit = reinterpret_cast<SetTargetUnitFn>(0x004949D0);
 using FindSkillByGuidFn = void*(__thiscall*)(void* skillManager, uint32_t guidLo, uint32_t guidHi);
 inline const auto FindSkillByGuid = reinterpret_cast<FindSkillByGuidFn>(0x005DC320);
 constexpr uint32_t kCharSkillManager = 0x184;
+// CSkillManager: every skill the character has (its class's, invested or not): CSkill* array at
+// +0x3C, count +0x40. 0x5DE550 SetSkillLevel(CSkill*, level) is what spending a skill point calls
+// (passives, type 4 at CSkill +0x38, get their effects through it). 0x4805A0 LearnSkill(name*, int).
+constexpr uint32_t kSkillManagerSkills = 0x3C;
+using SetSkillLevelFn = void(__thiscall*)(void* manager, void* skill, int level);
+inline const auto SetSkillLevel = reinterpret_cast<SetSkillLevelFn>(0x005DE550);
+using FindSkillByNameFn = void*(__thiscall*)(void* manager, const void* name /* VS2008 std::wstring* */);
+inline const auto FindSkillByName = reinterpret_cast<FindSkillByNameFn>(0x005DD660);
+using LearnSkillFn = int(__thiscall*)(Unit* unit, const void* name /* VS2008 std::wstring* */, int unused);
+inline const auto LearnSkill = reinterpret_cast<LearnSkillFn>(0x004805A0);
 constexpr uint32_t kCharCurrentSkill = 0x2D0;
 constexpr uint32_t kCharRightSkill = 0x2E0;
 constexpr uint32_t kCharHotkeySkills = 0x860; // 10 x uint64

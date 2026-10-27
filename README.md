@@ -102,7 +102,7 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Summoned minions in sync (copies follow the real ones; hits on copies reach the real minion) | done, rig-tested |
 | Party difficulty scaling (monster health per player, host setting) | done, rig-tested |
 | Stand-in level and base stats (so monsters' hit rolls use the real defenses) | done, rig-tested |
-| Stand-in passive skills and active buffs | not started |
+| Stand-in skills at the real levels (passives included); buffs come with replayed casts | done, rig-tested |
 | Town portals for other players (shown where cast; anyone can use one to go to town) | done, rig-tested |
 | Waypoints (to another floor: a party trip; to town: alone) | done, rig-tested |
 | Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |

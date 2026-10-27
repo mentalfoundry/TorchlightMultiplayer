@@ -1,0 +1,11 @@
+# Passive skills on stand-ins: the client invests in Armor Master (and Block and Parry); the host's
+# stand-in for it gets the same skill levels (compare.py checks every stand-in's invested skills).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync invested timeout=60
+wait 3
+dump skills
+sync end timeout=60
+quit

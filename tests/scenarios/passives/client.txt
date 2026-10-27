@@ -1,0 +1,14 @@
+# Passive skills on stand-ins (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+skilllevel 2 Armor Master
+skilllevel 1 Block and Parry
+wait 2
+sync invested timeout=60
+wait 3
+dump skills
+sync end timeout=60
+quit

@@ -36,7 +36,7 @@ class Session;
 //   expect monsterscale <x> | copyscale <x>  (party health multiplier on the monsters run / copies here)
 //   expect minioncopies <slot> <n> | nominioncopies <slot>  (copies of that player's minions here)
 //   expect minionhurt (ours)   hitminioncopy <slot> [damage]   killminion  useportal  (test only)
-//   waypoint <dungeon> <floor>  (as the waypoint menu does)
+//   waypoint <dungeon> <floor>  (as the waypoint menu does)   skilllevel <level> <skill name>  (invest)
 //   expect castsent <n> | castplayed <n>  (our casts sent / other players' casts shown here, since mark)
 //   walkto node [min distance]  (the nearest monster group not spawned yet)   teleport node [min]   teleport monster <min distance from the host>   teleport player <slot>
 //   expect dead|alive          expect town|dungeon       expect samelevel <slot>

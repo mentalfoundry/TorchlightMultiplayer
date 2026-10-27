@@ -15,7 +15,7 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 28;
+constexpr uint16_t kProtocolVersion = 29;
 constexpr int kMaxPlayers = 4;
 constexpr uint8_t kInvalidSlot = 0xFF;
 constexpr int kEquipSlots = 12; // CInventory slots 0..11 are the equipment slots
@@ -110,6 +110,8 @@ struct PlayerInfo
   uint64_t petGuid = 0;  // UNIT_GUID of the pet's definition; 0 if no pet
   uint16_t petLevel = 0;
   std::array<uint64_t, kEquipSlots> equipment{}; // UNIT_GUID per equipment slot, 0 if empty
+  // Skills the character has invested in (name, level): the stand-in gets them, passives included.
+  std::vector<std::pair<std::string, uint8_t>> skills;
 
   bool operator==(const PlayerInfo&) const = default;
 };
@@ -322,6 +324,12 @@ inline void writeInfo(Writer& w, const PlayerInfo& i)
     w.u32(static_cast<uint32_t>(i.equipment[slot]));
     w.u32(static_cast<uint32_t>(i.equipment[slot] >> 32));
   }
+  w.u8(static_cast<uint8_t>(i.skills.size() < 255 ? i.skills.size() : 255));
+  for (size_t k = 0; k < i.skills.size() && k < 255; k++)
+  {
+    w.str(i.skills[k].first);
+    w.u8(i.skills[k].second);
+  }
 }
 
 inline PlayerInfo readInfo(Reader& r)
@@ -342,6 +350,13 @@ inline PlayerInfo readInfo(Reader& r)
     guid |= static_cast<uint64_t>(r.u32()) << 32;
     if (slot < kEquipSlots)
       i.equipment[slot] = guid;
+  }
+  uint8_t skills = r.u8();
+  for (uint8_t k = 0; k < skills && r.ok(); k++)
+  {
+    std::string name = r.str();
+    uint8_t level = r.u8();
+    i.skills.push_back({name, level});
   }
   return i;
 }

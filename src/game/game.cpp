@@ -1,5 +1,6 @@
 #include "game/game.h"
 #include "game/diag.h"
+#include "game/vsstring.h"
 #include "game/engine.h"
 #include "game/internal.h"
 #include "game/autotest.h"
@@ -129,6 +130,8 @@ struct Avatar
   uint8_t* clientEntry = nullptr;  // host: stand-in CGameClient registered for this player
   uint64_t petFailedGuid = 0;      // pet GUID that could not be created (not retried)
   bool wasDead = false;
+  engine::Unit* skillsOn = nullptr; // stand-in the skill levels below were applied to
+  std::vector<std::pair<std::string, uint8_t>> skillsApplied;
 };
 
 static std::array<Avatar, net::kMaxPlayers> g_avatars;
@@ -282,6 +285,22 @@ net::PlayerInfo localPlayerInfo()
     {
       if (void* item = engine::GetItemInSlot(inv, slot))
         info.equipment[slot] = engine::field<uint64_t>(item, engine::kUnitGuid);
+    }
+  }
+  if (uintptr_t player = localPlayer())
+  {
+    // Invested skills (level > 0) by name: the stand-in learns them at the same level.
+    void* mgr = engine::field<void*>(reinterpret_cast<void*>(player), engine::kCharSkillManager);
+    void** skills = mgr ? engine::field<void**>(mgr, engine::kSkillManagerSkills) : nullptr;
+    uint32_t count = mgr ? engine::field<uint32_t>(mgr, engine::kSkillManagerSkills + 4) : 0;
+    for (uint32_t i = 0; skills && i < count && i < 128; i++)
+    {
+      void* sk = skills[i];
+      int level = sk ? engine::field<int>(sk, 0xA4) : 0;
+      auto* data = sk ? engine::field<uint8_t*>(sk, 0x5C) : nullptr;
+      wchar_t name[96] = {};
+      if (level > 0 && data && diag::readWString(reinterpret_cast<uintptr_t>(data) + 0xCC, name, 96) && name[0])
+        info.skills.push_back({toUtf8(name), static_cast<uint8_t>(level > 255 ? 255 : level)});
     }
   }
   if (uintptr_t pet = localPet())
@@ -527,6 +546,38 @@ static void spawnPet(uint8_t slot, engine::Level* level)
 // Shows the remote character's health on its stand-in (hover health bar, and what monsters see).
 // Max health comes from the base fields, which on a stand-in nothing else sets; the stand-in's
 // own stat bonuses are tiny compared to the real character's, so the max shown is the real one.
+// The real character's invested skills on its stand-in, at their levels: passives (armor, block,
+// resistances...) then count for monsters' hits on it, as they do on the real character.
+static void applySkills(Avatar& a)
+{
+  engine::Unit* unit = a.player.unit;
+  if (!unit || (a.skillsOn == unit && a.skillsApplied == a.info.skills))
+    return;
+  unsigned set = 0;
+  for (const auto& [name, level] : a.info.skills)
+  {
+    vs::WString w = vs::make(fromUtf8(name).c_str());
+    void* mgr = engine::field<void*>(unit, engine::kCharSkillManager);
+    void* skill = mgr ? engine::FindSkillByName(mgr, &w) : nullptr;
+    if (!skill)
+    {
+      engine::LearnSkill(unit, &w, 0); // not one of its class's (e.g. a spell from a scroll)
+      mgr = engine::field<void*>(unit, engine::kCharSkillManager);
+      skill = mgr ? engine::FindSkillByName(mgr, &w) : nullptr;
+    }
+    vs::destroy(&w);
+    if (skill && engine::field<int>(skill, 0xA4) != level)
+    {
+      engine::SetSkillLevel(mgr, skill, level);
+      set++;
+    }
+  }
+  a.skillsOn = unit;
+  a.skillsApplied = a.info.skills;
+  if (set)
+    TLMP_LOG("game: stand-in %p got %u skill levels (%zu invested skills)", unit, set, a.info.skills.size());
+}
+
 // The real character's level and base stats on its stand-in (see PlayerState).
 static void applyStats(engine::Unit* unit, const net::PlayerState& s)
 {
@@ -700,6 +751,7 @@ static void updateAvatars()
       if (a.player.unit && steer(a.player, {a.state.pos[0], a.state.pos[1], a.state.pos[2]}))
         applyFacing(a.player, a.state.rot);
       applyStats(a.player.unit, a.state);
+      applySkills(a);
       applyVitals(a.player.unit, a.state.health, a.state.maxHealth);
     }
     if (a.pet.unit)
