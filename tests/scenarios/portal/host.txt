@@ -1,0 +1,23 @@
+# Town portals: the client opens a town portal with the real spell, away from the host. The host's
+# game shows it (the client's stand-in casts it), where the client stands, and the host stays put.
+# Then the host uses that portal: to town, alone (the client stays), and back down to the party.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+mark
+sync cast timeout=90
+wait 5
+expect dungeon
+expect samelevel 1 timeout=5
+dump portal
+useportal timeout=20
+expect town timeout=60
+sync intown timeout=60
+wait 3
+stairs down
+expect dungeon timeout=60
+expect samelevel 1 timeout=60
+sync back timeout=60
+sync end timeout=60
+quit

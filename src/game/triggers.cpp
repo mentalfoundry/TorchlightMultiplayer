@@ -371,6 +371,12 @@ void applySnapshot(net::Reader& r)
   }
 }
 
+void forEachTrigger(void (*fn)(void* trigger, void* ctx), void* ctx)
+{
+  for (engine::Unit* t : g_registry)
+    fn(t, ctx);
+}
+
 bool farthestTrigger(float* x, float* z)
 {
   engine::Unit* me = reinterpret_cast<engine::Unit*>(localPlayer());

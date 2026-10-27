@@ -366,6 +366,16 @@ static void hostSendRoster(engine::Level* level)
 static void hostSendState(engine::Level* level)
 {
   uint32_t lid = levelId(level);
+  // Every few seconds the state of every monster goes out, not just of those near each player:
+  // whatever a copy missed (a maximum that changed with the party size, a look that came late)
+  // is put right within that time.
+  static float nextFull = 0.0f;
+  bool periodic = clock() >= nextFull;
+  if (periodic)
+  {
+    nextFull = clock() + 5.0f;
+    g_fullStateDue = g_fullStateDue || periodic;
+  }
   for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
   {
     if (slot == g_session->localSlot() || !floor::slotInGame(slot) || floor::slotLevel(slot) != lid)

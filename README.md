@@ -62,7 +62,8 @@ open and close while tests run; avoid typing during a run (the game reads some k
   then counts down; a softcore player who is dead must resurrect first. Hardcore-dead players and those
   on the title screen don't count (they stay connected and can come back with another character).
 - **Town** trips are always allowed alone; everyone in town is in the same town. Going back down puts
-  you on the party's floor.
+  you on the party's floor. Anyone's town portal works for everyone: others see it where it was
+  opened and can step through it to town.
 - **Who runs a floor.** The host's machine simulates the floor it is on; if the host is in town or on
   the title screen, the lowest-numbered player on the floor takes over (monsters, doors and events are
   handed over), so the dungeon keeps running.
@@ -102,7 +103,8 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Party difficulty scaling (monster health per player, host setting) | done, rig-tested |
 | Stand-in level and base stats (so monsters' hit rolls use the real defenses) | done, rig-tested |
 | Stand-in passive skills and active buffs | not started |
-| Town portals and waypoints for other players | not started |
+| Town portals for other players (shown where cast; anyone can use one to go to town) | done, rig-tested |
+| Waypoints between dungeon floors as party trips | built on the travel rules, not yet tested |
 | Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).

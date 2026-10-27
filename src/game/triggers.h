@@ -36,8 +36,9 @@ void onTriggerDestroyed(void* trigger);
 int beforeInteract(void* trigger, void* user);
 void afterInteract(void* trigger, void* user, int stateBefore);
 
-// Test mode: the door/lever/chest farthest from the local player.
+// Test mode: the door/lever/chest farthest from the local player; every live trigger.
 bool farthestTrigger(float* x, float* z);
+void forEachTrigger(void (*fn)(void* trigger, void* ctx), void* ctx);
 
 // Floor handover (floor.cpp): the states of every used door/lever on the current floor.
 void writeSnapshot(net::Writer& w);

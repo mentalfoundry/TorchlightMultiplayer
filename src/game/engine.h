@@ -385,6 +385,9 @@ constexpr uint32_t kTriggerLoops = 0x1F8;        // int, nonzero = cycles instea
 // 0x4E1CC0: CTriggerUnit::Interact(CCharacter* user), vtable slot 79 (+0x13C): requirement
 // checks (keys, quests) then Activate.
 constexpr uintptr_t kTriggerInteract = 0x004E1CC0;
+using TriggerInteractFn = uint32_t(__thiscall*)(Unit* trigger, Unit* user);
+// The town portal a Town Portal spell opens (CTriggerUnit, at the caster): UNIT_GUID.
+constexpr uint64_t kTownPortalGuid = 0xd3a8f99f2fa111deull;
 // 0x4E1180: CTriggerUnit::Activate(CCharacter* user), ret 4: one state step + logic events;
 // user may be null.
 using TriggerActivateFn = void(__thiscall*)(Unit* trigger, Unit* user);

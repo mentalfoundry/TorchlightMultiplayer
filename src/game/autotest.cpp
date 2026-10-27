@@ -698,6 +698,26 @@ void dump(const std::string& tag)
       }
     }
   }
+  o << "],\"triggers\":[";
+  {
+    struct T
+    {
+      std::ostringstream* o;
+      bool first;
+    } tc{&o, true};
+    triggers::forEachTrigger(
+      [](void* t, void* p) {
+        auto* c = static_cast<T*>(p);
+        auto* u = static_cast<engine::Unit*>(t);
+        Vec3 at = unitPosition(u);
+        char g[32];
+        std::snprintf(g, sizeof(g), "%016llx", engine::field<uint64_t>(u, engine::kUnitGuid));
+        *c->o << (c->first ? "" : ",") << "{\"guid\":\"" << g << "\",\"name\":\"" << jsonEscape(unitName(u))
+              << "\",\"x\":" << at.x << ",\"z\":" << at.z << "}";
+        c->first = false;
+      },
+      &tc);
+  }
   o << "],\"shared\":[";
   struct S
   {
@@ -1336,12 +1356,52 @@ Poll run(const Step& s, bool begin, std::string& why)
     Vec3 at = target ? unitPosition(target) : Vec3{myPos.x + 5.0f, myPos.y, myPos.z};
     engine::AimAt(m, at.x, at.z);
     engine::SetTargetUnit(m, target);
-    uint32_t r = reinterpret_cast<engine::UseSkillFn>(engine::kUseSkill)(m, static_cast<uint32_t>(guid),
-                                                                       static_cast<uint32_t>(guid >> 32));
+    uint32_t r = 0;
+    if (s.args.back() == "input")
+    {
+      // Through CGameClient's own use-skill (0x414790), as a click on the skill does.
+      using ClientUseSkillFn = uint8_t(__thiscall*)(void* client, uint32_t lo, uint32_t hi, char a, char b);
+      r = reinterpret_cast<ClientUseSkillFn>(0x00414790)(reinterpret_cast<void*>(gameClient()),
+                                                          static_cast<uint32_t>(guid), static_cast<uint32_t>(guid >> 32), 0, 0);
+    }
+    else
+      r = reinterpret_cast<engine::UseSkillFn>(engine::kUseSkill)(m, static_cast<uint32_t>(guid),
+                                                                  static_cast<uint32_t>(guid >> 32));
     char b[96];
     std::snprintf(b, sizeof(b), "skill %016llx at (%.1f, %.1f) -> %u", guid, at.x, at.z, r);
     why = b;
     return Poll::Done; // 0 may only mean "queued until in range": the game casts it when it gets there
+  }
+  if (cmd == "useportal")
+  {
+    // Test only: step into the nearest town portal, as a click on it does (Interact).
+    struct C
+    {
+      Vec3 from;
+      float best;
+      engine::Unit* unit;
+    } c{myPos, 1e9f, nullptr};
+    triggers::forEachTrigger(
+      [](void* t, void* p) {
+        auto* c = static_cast<C*>(p);
+        auto* u = static_cast<engine::Unit*>(t);
+        float d = distXZ(unitPosition(u), c->from);
+        if (engine::field<uint64_t>(u, engine::kUnitGuid) == engine::kTownPortalGuid && d < c->best)
+        {
+          c->best = d;
+          c->unit = u;
+        }
+      },
+      &c);
+    if (!c.unit)
+    {
+      why = "no town portal";
+      return Poll::Wait;
+    }
+    Vec3 at = unitPosition(c.unit);
+    engine::setPosition(m, Vec3{at.x + 1.0f, myPos.y, at.z});
+    reinterpret_cast<engine::TriggerInteractFn>(engine::kTriggerInteract)(c.unit, m);
+    return Poll::Done;
   }
   if (cmd == "killminion")
   {
@@ -1609,7 +1669,8 @@ void tick()
   }
   if (p == Poll::Wait)
     return;
-  bool check = s.args[0] == "expect" || s.args[0] == "pickup" || s.args[0] == "killnear" || s.args[0] == "teleport";
+  bool check = s.args[0] == "expect" || s.args[0] == "pickup" || s.args[0] == "killnear" || s.args[0] == "teleport" ||
+               s.args[0] == "skill" || s.args[0] == "learnskill";
   if (p == Poll::Fail)
   {
     g_failed++;

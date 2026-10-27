@@ -28,6 +28,7 @@ $suite = [ordered]@{
   summon      = @()
   minions     = @()
   scaling     = @('scaled')
+  portal      = @()
 }
 $summary = @()
 foreach ($name in $suite.Keys) {
