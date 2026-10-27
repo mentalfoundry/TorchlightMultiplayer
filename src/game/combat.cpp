@@ -2,6 +2,7 @@
 #include "game/floor.h"
 #include "game/internal.h"
 #include "game/monsters.h"
+#include "game/skills.h"
 #include "log.h"
 #include "net/session.h"
 
@@ -40,6 +41,7 @@ struct Counters
   unsigned taken = 0;     // client: host monster hits applied to us
   unsigned dropped = 0;   // either: arrived for another floor / unknown unit
   unsigned kills = 0;     // rewards given for kills by others
+  unsigned showOnly = 0;  // host: hits by stand-ins' own skills or summons, dropped
 };
 static Counters g_count;
 
@@ -106,8 +108,8 @@ static bool clientHitsCopy(engine::Unit* target, Hit& hit)
 {
   uintptr_t me = localPlayer();
   auto attacker = reinterpret_cast<uintptr_t>(hit.attacker);
-  // Copies (monsters and remote players alike) only show what happens on other machines.
-  if (attacker && (monsters::isPuppetUnit(hit.attacker) || isAvatarUnit(hit.attacker)))
+  // Copies (monsters, remote players and their summons) only show what happens on other machines.
+  if (attacker && (monsters::isPuppetUnit(hit.attacker) || skills::isShowOnly(hit.attacker)))
     return false;
   uint8_t kind = !attacker                     ? kByOther
                  : attacker == me              ? kByPlayer
@@ -238,11 +240,11 @@ void tick()
   next = clock() + 10.0f;
   const Counters& c = g_count;
   if (c.sent == last.sent && c.applied == last.applied && c.forwarded == last.forwarded && c.taken == last.taken &&
-      c.dropped == last.dropped && c.kills == last.kills)
+      c.dropped == last.dropped && c.showOnly == last.showOnly && c.kills == last.kills)
     return;
   last = c;
-  TLMP_LOG("combat: hits sent %u, applied %u, forwarded %u, taken %u, dropped %u; shared kills %u", c.sent, c.applied,
-           c.forwarded, c.taken, c.dropped, c.kills);
+  TLMP_LOG("combat: hits sent %u, applied %u, forwarded %u, taken %u, dropped %u, show-only %u; shared kills %u", c.sent,
+           c.applied, c.forwarded, c.taken, c.dropped, c.showOnly, c.kills);
 }
 
 void onMessage(uint8_t fromSlot, Msg type, net::Reader& r)
@@ -261,7 +263,18 @@ bool beforeTakeDamage(engine::Unit* target, Hit& hit)
   if (!connected() || !target || target == g_applyingTo || !(hit.damage > 0.0f))
     return true;
   if (floor::ownsCurrentLevel())
+  {
+    // A stand-in's own skills (and its summons) are for show: the real player's hits come from
+    // their machine (onMonsterDamage applies those, and they pass above).
+    if (skills::isShowOnly(hit.attacker))
+    {
+      if (++g_count.showOnly <= kDetailedLogs)
+        TLMP_LOG("combat: [host] dropped a show-only hit for %.1f by %p (a stand-in's own skill or summon)", hit.damage,
+                 hit.attacker);
+      return false;
+    }
     return hostHitsStandIn(target, hit);
+  }
   if (monsters::isPuppetUnit(target))
     return clientHitsCopy(target, hit);
   if (isAvatarUnit(target))

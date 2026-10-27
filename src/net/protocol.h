@@ -15,7 +15,7 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 23;
+constexpr uint16_t kProtocolVersion = 24;
 constexpr int kMaxPlayers = 4;
 constexpr uint8_t kInvalidSlot = 0xFF;
 constexpr int kEquipSlots = 12; // CInventory slots 0..11 are the equipment slots
@@ -88,6 +88,7 @@ enum class Msg : uint8_t
   EventWait,     // owner->everyone (via host) reliable: slot mask -- an event on the party floor waits for them
   TestSync,      // both, reliable (test mode only): slot, barrier name -- the host relays it to everyone
   QuestSpawn,    // ->floor owner reliable: levelId, position, saved unit state -- a monster my quest places here
+  SkillCast,     // ->floor reliable: levelId, skill GUID, level, name, aim point, target id -- I started a skill
 };
 
 enum class RejectReason : uint8_t

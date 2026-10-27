@@ -915,14 +915,35 @@ static void cleanMinions()
   *endField = out;
 }
 
+// Stand-ins and pet copies taken off their level while the game saves (beforeSave / afterSave).
+static bool g_offForSave[net::kMaxPlayers][2];
+
 void beforeSave(void* client)
 {
   // Nothing belonging to remote players may be on the floor or in the minion list when the
-  // game saves; avatars come back on the next tick.
+  // game saves. They are taken off the level for the save and put back right after: destroying
+  // them instead (and building them again) unloads their gear's meshes, which took up to 16 s on
+  // a floor with many monsters.
   for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
   {
-    release(g_avatars[slot].pet, slot, "pet (saving)");
-    release(g_avatars[slot].player, slot, "avatar (saving)");
+    Avatar& a = g_avatars[slot];
+    Puppet* parts[2] = {&a.player, &a.pet};
+    for (int i = 0; i < 2; i++)
+    {
+      Puppet& p = *parts[i];
+      g_offForSave[slot][i] = false;
+      if (!p.unit)
+        continue;
+      if (!p.level)
+      {
+        release(p, slot, i == 0 ? "avatar (saving)" : "pet (saving)"); // its level is gone: nothing to put it back on
+        continue;
+      }
+      if (i == 0)
+        unregisterClientEntry(a);
+      engine::RemoveUnit(p.level, p.unit, false);
+      g_offForSave[slot][i] = true;
+    }
   }
   cleanMinions();
   auto* field = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(client) + engine::kClientWorldSeed);
@@ -935,6 +956,24 @@ void afterSave(void* client)
   auto* field = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(client) + engine::kClientWorldSeed);
   if (g_hostWorldSeed && *field == g_ownWorldSeed)
     *field = g_hostWorldSeed;
+  for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
+  {
+    Avatar& a = g_avatars[slot];
+    Puppet* parts[2] = {&a.player, &a.pet};
+    for (int i = 0; i < 2; i++)
+    {
+      Puppet& p = *parts[i];
+      if (!g_offForSave[slot][i])
+        continue;
+      g_offForSave[slot][i] = false;
+      if (!p.unit || !p.level)
+        continue;
+      Vec3 pos = unitPosition(p.unit);
+      engine::AddUnit(p.level, p.unit, &pos, false);
+      if (i == 0)
+        registerClientEntry(a, slot);
+    }
+  }
 }
 
 // Keeps client+0xFB0 equal to the host's value. Re-checked every frame because loading a

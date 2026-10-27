@@ -331,7 +331,12 @@ static void joinTick()
   float now = clock();
   uint32_t here = levelId(level);
   const floor::PartyFloor& pf = floor::partyFloor();
-  if (here != myLevel)
+  // A level exists from the start of its (seconds-long) load: time on it counts from the first
+  // frame after the load, and any long stall starts the count again.
+  static float lastTick = 0.0f;
+  bool stalled = now - lastTick > 1.0f;
+  lastTick = now;
+  if (here != myLevel || stalled)
   {
     myLevel = here;
     myLevelSince = now;

@@ -1,0 +1,25 @@
+# Skills across games: the client casts its right-click skill at a monster; the host's game shows it
+# (the client's stand-in casts it too, for show). Then the host casts and the client shows it.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+console GOD
+teleport monster 0
+wait 1
+mark
+sync near timeout=60
+sync clientcast timeout=60
+expect castplayed 1 timeout=20
+wait 0.3
+shot clientcast
+dump clientcast
+wait 3
+mark
+skill right timeout=20
+expect castsent 1 timeout=20
+wait 0.3
+shot hostcast
+sync hostcast timeout=60
+sync end timeout=60
+quit

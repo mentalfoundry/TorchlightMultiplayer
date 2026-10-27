@@ -24,6 +24,8 @@ $suite = [ordered]@{
   questlate   = @()
   hardcore    = @()
   party4      = @('start', 'arrived')
+  skills      = @()
+  summon      = @()
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

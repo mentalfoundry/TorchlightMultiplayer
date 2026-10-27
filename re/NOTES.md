@@ -231,3 +231,24 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   treasure table (+0x614): 0x5FF560 then CLevel 0x4F7790 (returns 0x4AACDB). Without one: CLevel
   0x4F7A40 (returns 0x4AAC6E); breakables/chests call 0x4F7A40 from 0x48453D with no killer.
   Rolls often drop nothing. Rig: `expect lootrolls N` counts Kill's rolls since `mark`.
+
+## Skills (2026-10-28)
+- 0x496EB0 `CCharacter::UseSkill(guidLo, guidHi)` ret 8 -> 0 refused or queued, 1 started (or busy);
+  guid -1 = the current skill (+0x2D0 CSkill*). A request out of range leaves AI state 13 (queued);
+  the character's update then calls UseSkill(-1) from 0x497EE1, which starts it: state 14, the skill
+  animation (0x486070), +0x20B = 1. Player input: CGameClient 0x414790(client, guidLo, guidHi, c, c):
+  aims with 0x486180(x, z) (target point +0x1CC, direction +0x1D8) and 0x4949D0(unit) (+0x290).
+- CSkillManager at character +0x184 (created on demand by 0x5DE7B0): 0x5DC320 FindSkillByGuid,
+  0x5DD660 FindSkill(const std::wstring* name). 0x4805A0 `LearnSkill(const std::wstring* name, int)`
+  ret 8 (console SKILL: learn, then 0x488770 puts it on the right button); 0x4804E0 learns a clone of
+  a CSkill*. CSkill: +0x180 GUID, +0x5C level data (+0xCC name wstring, +0x44 type, +0x4C mana cost),
+  +0xA4 level (0 = uninvested: does nothing), 0x5D5E80 SetLevel. Slots on the character: +0x2E0 right,
+  +0x2E8, +0x2F0, hotkeys +0x860 (10 GUIDs). Mana: float +0x3B8.
+- Skills whose effect hangs on a class animation's event (e.g. Summon Imp) do nothing on another
+  class; shared spells (media/skills/shared, e.g. Summon Skeleton: anim special_gen_buff) work on any.
+
+## Slow saves (2026-10-28)
+- Destroying a dressed CPlayer (vtable delete) unloads its gear meshes: 0x4A9340 -> 0x49E5D0 ->
+  0x4E4410 -> 0x4E4110 (MeshManager::getSingleton, remove) took 2-17 s on floors with ~100 monsters
+  (found by sampling the game thread during saves). Stand-ins are therefore only taken off the level
+  for a save (RemoveUnit / AddUnit), never destroyed and rebuilt.

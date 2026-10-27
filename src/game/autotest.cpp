@@ -8,6 +8,7 @@
 #include "game/loot.h"
 #include "game/monsters.h"
 #include "game/party.h"
+#include "game/skills.h"
 #include "game/spawns.h"
 #include "game/triggers.h"
 #include "log.h"
@@ -72,6 +73,7 @@ uint32_t g_levelMark = 0;
 unsigned g_monstersMark = 0;
 int g_groundMark = 0;
 unsigned g_rollsMark = 0;
+unsigned g_castsSentMark = 0, g_castsPlayedMark = 0;
 void* g_area = nullptr; // trigger area of the last `teleport area`
 bool g_hasShared = false; // a position another machine shared (`share node`), for `teleport shared`
 float g_sharedX = 0.0f, g_sharedZ = 0.0f;
@@ -825,6 +827,34 @@ Poll expectCheck(const Step& s, std::string& why)
       return fired == 0 ? Poll::Done : Poll::Fail;
     return (want == "fired" ? fired > 0 : waiting) ? Poll::Done : Poll::Wait;
   }
+  if (what == "looks") // every copy here has its owner's look (names, champions, health)
+  {
+    unsigned n = monsters::copiesWithoutLook();
+    why = std::to_string(n) + " copies still built from the type only";
+    return n == 0 ? Poll::Done : Poll::Wait;
+  }
+  if (what == "minions") // minions <slot> <n>: that player's character here has n minions besides its pet
+  {
+    int slot = intArg(s, 2);
+    engine::Unit* who = slot == mySlot() ? me() : avatarOf(static_cast<uint8_t>(slot));
+    int n = 0;
+    if (who)
+    {
+      auto** it = engine::field<engine::Unit**>(who, engine::kPlayerMinions);
+      auto** end = engine::field<engine::Unit**>(who, engine::kPlayerMinions + 4);
+      for (; it && it != end; ++it)
+        if (*it && reinterpret_cast<uintptr_t>(*it) != localPet() && !isAvatarUnit(*it))
+          n++;
+    }
+    why = std::to_string(n) + " minions";
+    return n >= intArg(s, 3) ? Poll::Done : Poll::Wait;
+  }
+  if (what == "castsent" || what == "castplayed") // our casts sent / others' casts shown here, since mark
+  {
+    unsigned n = what == "castsent" ? skills::castsSent() - g_castsSentMark : skills::castsPlayed() - g_castsPlayedMark;
+    why = std::to_string(n) + (what == "castsent" ? " casts sent" : " casts shown") + " since mark";
+    return static_cast<int>(n) >= intArg(s, 2) ? Poll::Done : Poll::Wait;
+  }
   if (what == "lootrolls") // lootrolls N: our game rolled treasure for N kills since mark (drops are random)
   {
     unsigned n = hooks::killTreasureRolls() - g_rollsMark;
@@ -981,6 +1011,8 @@ Poll run(const Step& s, bool begin, std::string& why)
     nearestMonster(1e9f, &g_monstersMark);
     g_groundMark = groundItemsNear(30.0f);
     g_rollsMark = hooks::killTreasureRolls();
+    g_castsSentMark = skills::castsSent();
+    g_castsPlayedMark = skills::castsPlayed();
     g_noticeMark = g_notices.size();
     return Poll::Done;
   }
@@ -1235,6 +1267,35 @@ Poll run(const Step& s, bool begin, std::string& why)
   {
     why = "no such animation";
     return anim::playOneShot(m, s.args.size() > 1 ? s.args[1].c_str() : "") ? Poll::Done : Poll::Fail;
+  }
+  if (cmd == "skill" && s.args.size() > 1)
+  {
+    // Test only: use a skill the way player input does (0x414790): aim at the nearest monster
+    // (or straight ahead), then UseSkill. skill right | skill slot <0-9>
+    uint64_t guid = s.args[1] == "right" ? engine::field<uint64_t>(m, engine::kCharRightSkill)
+                                         : engine::field<uint64_t>(m, engine::kCharHotkeySkills + 8 * intArg(s, 2));
+    if (guid == ~0ull || !guid)
+    {
+      why = "no skill in that slot";
+      return Poll::Fail;
+    }
+    engine::Unit* target = nearestMonster(25.0f);
+    Vec3 at = target ? unitPosition(target) : Vec3{myPos.x + 5.0f, myPos.y, myPos.z};
+    engine::AimAt(m, at.x, at.z);
+    engine::SetTargetUnit(m, target);
+    uint32_t r = reinterpret_cast<engine::UseSkillFn>(engine::kUseSkill)(m, static_cast<uint32_t>(guid),
+                                                                       static_cast<uint32_t>(guid >> 32));
+    char b[96];
+    std::snprintf(b, sizeof(b), "skill %016llx at (%.1f, %.1f) -> %u", guid, at.x, at.z, r);
+    why = b;
+    return Poll::Done; // 0 may only mean "queued until in range": the game casts it when it gets there
+  }
+  if (cmd == "learnskill" && s.args.size() > 1)
+  {
+    // Test only: learn a skill by name (e.g. learnskill Summon Imp) and put it on the right button.
+    std::string name = restFrom(s, 1);
+    why = name;
+    return skills::learnForTest(m, name) ? Poll::Done : Poll::Fail;
   }
   if (cmd == "hardcore" && s.args.size() > 1)
   {

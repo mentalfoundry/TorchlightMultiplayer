@@ -8,6 +8,7 @@ expect avatar 0 timeout=60
 expect avatar 2 timeout=60
 expect avatar 3 timeout=60
 wait 3
+expect looks timeout=30
 dump start
 walkto player 0 timeout=60
 sync gathered timeout=120
@@ -16,6 +17,7 @@ expect newlevel timeout=90
 expect samelevel 0 timeout=60
 wait 6
 sync arrived timeout=90
+expect looks timeout=30
 dump arrived
 sync end timeout=90
 quit

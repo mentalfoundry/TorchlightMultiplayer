@@ -9,6 +9,7 @@
 #include "game/floor.h"
 #include "game/loot.h"
 #include "game/quests.h"
+#include "game/skills.h"
 #include "game/spawns.h"
 #include "game/game.h"
 #include "game/hooks.h"
@@ -196,6 +197,7 @@ static void start()
   game::floor::attach(&g_session);
   game::spawns::attach(&g_session);
   game::quests::attach(&g_session);
+  game::skills::attach(&g_session);
   game::combat::attach(&g_session);
   game::anim::attach(&g_session);
   game::loot::attach(&g_session);
@@ -251,6 +253,9 @@ static void dispatch(uint8_t from, net::Msg type, net::Reader& r)
       break;
     case Msg::QuestSpawn:
       game::quests::onMessage(from, type, r);
+      break;
+    case Msg::SkillCast:
+      game::skills::onMessage(from, type, r);
       break;
     case Msg::ItemDrop:
     case Msg::ItemSpawn:

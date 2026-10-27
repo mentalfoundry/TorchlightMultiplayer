@@ -1095,6 +1095,15 @@ void discardOwn()
   TLMP_LOG("monsters: dropped my own %u monsters; this floor is run elsewhere", n);
 }
 
+unsigned copiesWithoutLook()
+{
+  unsigned n = 0;
+  for (const auto& [id, m] : g_mirrors)
+    if (m.puppet.unit && !m.fromLook)
+      n++;
+  return n;
+}
+
 void allowLocalSpawns(bool allow)
 {
   g_spawningPuppet = allow;

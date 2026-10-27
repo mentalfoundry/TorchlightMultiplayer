@@ -1,0 +1,23 @@
+# Skills across games (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+console GOD
+wait 2
+teleport player 0
+wait 1
+mark
+sync near timeout=60
+skill right timeout=20
+expect castsent 1 timeout=20
+wait 0.3
+shot clientcast
+sync clientcast timeout=60
+mark
+sync hostcast timeout=60
+expect castplayed 1 timeout=20
+shot hostcast
+sync end timeout=60
+quit

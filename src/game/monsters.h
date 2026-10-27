@@ -56,6 +56,9 @@ void becomeMirror();
 // We ran a floor someone else runs too (both loaded it at once): our own monsters go, copies of
 // theirs come with their roster.
 void discardOwn();
+// Copies built from the monster's type alone so far (their look -- names, champions, health -- not
+// in yet). Test mode.
+unsigned copiesWithoutLook();
 
 // Quests (quests.cpp).
 void allowLocalSpawns(bool allow);  // let our own AddUnit calls through on a floor run elsewhere

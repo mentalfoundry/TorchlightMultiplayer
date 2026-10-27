@@ -1,0 +1,21 @@
+# Summons across games (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+console GOD
+learnskill Summon Skeleton
+wait 2
+teleport player 0
+wait 1
+mark
+sync near timeout=60
+skill right timeout=20
+expect castsent 1 timeout=20
+expect minions 1 1 timeout=20
+sync cast timeout=60
+wait 4
+shot summoned
+sync end timeout=60
+quit

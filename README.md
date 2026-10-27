@@ -72,6 +72,9 @@ open and close while tests run; avoid typing during a run (the game reads some k
   Monsters, champions included, are exact copies on every machine (names, health, positions).
 - **Loot.** Each player rolls their own loot for every kill they share in (often nothing, as in single
   player). Items a player drops are shared: whoever picks one up first gets it.
+- **Skills.** When you use a skill, everyone else's game has your character cast it too, aimed the
+  same way: missiles, effects and summoned minions show up for everyone. Those casts are for show;
+  damage only comes from your own game.
 - **Death.** Each player gets their own death screen.
 - **Quests** stay in each player's own save: anyone can take any quest their save allows, whatever floor
   the session is on. A quest's monsters are created by the machine running the floor for everyone; one
@@ -90,7 +93,8 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Quests: per-save quests, shared targets and kill credit | done, rig-tested |
 | Party-wide trigger events with waiting messages | done, rig-tested |
 | Monster groups waking near remote players, quest targets for late arrivals, hardcore deaths, 4 players | done, rig-tested |
-| Skills/spells effects and summoned minions on other machines | not started |
+| Skills and spells on other machines (cast for show by the player's stand-in), summons | done, rig-tested |
+| Summoned minions in sync (each machine runs its own; only the caster's deals damage) | not started |
 | Party difficulty scaling | not started |
 | Stand-in stats (remote players are level-1 characters wearing the real gear) | not started |
 | Town portals and waypoints for other players | not started |

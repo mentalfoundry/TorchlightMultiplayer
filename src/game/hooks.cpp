@@ -4,6 +4,7 @@
 #include "game/floor.h"
 #include "game/loot.h"
 #include "game/quests.h"
+#include "game/skills.h"
 #include "game/spawns.h"
 #include "game/monsters.h"
 #include "game/party.h"
@@ -437,6 +438,17 @@ static __declspec(naked) void levelFromFileStub()
   }
 }
 
+// CCharacter::UseSkill(guid): the local player's casts are shown on the other machines.
+using UseSkillHookFn = uint32_t(__fastcall*)(void* self, void* edx, uint32_t lo, uint32_t hi);
+static UseSkillHookFn g_useSkill = nullptr;
+
+static uint32_t __fastcall useSkillHook(void* self, void* edx, uint32_t lo, uint32_t hi)
+{
+  (void)edx;
+  return game::skills::useSkill(reinterpret_cast<engine::UseSkillFn>(g_useSkill), static_cast<engine::Unit*>(self), lo,
+                                hi);
+}
+
 // Treasure rolls (CLevel 0x4F7790 / 0x4F7A40, engine.h): counts Kill's rolls for the rig; what a roll
 // drops is random.
 static void* g_dropTreasureTable = nullptr;
@@ -646,6 +658,9 @@ bool install()
     return false;
   if (!hook(0x00415A50, reinterpret_cast<void*>(&loadCharacterStub), &g_loadCharacter, "LoadCharacter (log)") ||
       !hook(0x00500BC0, reinterpret_cast<void*>(&levelFromFileStub), &g_levelFromFile, "CLevel::BuildFromFile (log)"))
+    return false;
+  if (!hook(engine::kUseSkill, reinterpret_cast<void*>(&useSkillHook), reinterpret_cast<void**>(&g_useSkill),
+            "CCharacter::UseSkill"))
     return false;
   if (!hook(engine::kDropTreasureTable, reinterpret_cast<void*>(&dropTreasureTableStub), &g_dropTreasureTable,
             "CLevel::DropTreasureTable") ||

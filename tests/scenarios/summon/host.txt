@@ -1,0 +1,19 @@
+# Summons across games: the client (learning the Summon Skeleton spell for the test) summons next to monsters. The
+# host's game shows the cast with the stand-in summoning skeletons too -- for show: their hits are dropped.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+console GOD
+teleport monster 0
+wait 1
+mark
+sync near timeout=60
+sync cast timeout=60
+expect castplayed 1 timeout=20
+expect minions 1 1 timeout=20
+wait 4
+shot summoned
+dump summoned
+sync end timeout=60
+quit

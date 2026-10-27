@@ -316,6 +316,30 @@ constexpr uintptr_t kAnimPlay = 0x004C8AD0;
 constexpr uintptr_t kAnimCrossfade = 0x004CA8E0;
 constexpr uintptr_t kAnimQueue = 0x004C8950;
 
+// --- skills --------------------------------------------------------------------------------------
+// 0x496EB0: CCharacter::UseSkill(guidLo, guidHi) -> 0 when refused (unknown skill, no mana, ...),
+// ret 8; guid -1 = the current skill. Player input (0x414790, CGameClient), the AI and the UI all
+// come through here. Player input first aims: 0x486180(x, z) sets the target point (+0x1CC, and
+// the direction +0x1D8), 0x4949D0(unit) the target unit (+0x290). Skills live in the character's
+// CSkillManager (+0x184): 0x5DC320 FindSkillByGuid(lo, hi), 0x5DD660 FindSkill(name). CSkill +0x180
+// GUID (uint64). Character: +0x2D0 current CSkill*, +0x2E0 / +0x2E8 / +0x2F0 skill GUIDs of the
+// mouse slots (right, alternate, ...), +0x860 the ten hotkey slots (GUID pairs).
+using UseSkillFn = uint32_t(__thiscall*)(Unit* unit, uint32_t guidLo, uint32_t guidHi);
+constexpr uintptr_t kUseSkill = 0x00496EB0;
+using AimAtFn = void(__thiscall*)(Unit* unit, float x, float z);
+inline const auto AimAt = reinterpret_cast<AimAtFn>(0x00486180);
+using SetTargetUnitFn = void(__thiscall*)(Unit* unit, Unit* target);
+inline const auto SetTargetUnit = reinterpret_cast<SetTargetUnitFn>(0x004949D0);
+using FindSkillByGuidFn = void*(__thiscall*)(void* skillManager, uint32_t guidLo, uint32_t guidHi);
+inline const auto FindSkillByGuid = reinterpret_cast<FindSkillByGuidFn>(0x005DC320);
+constexpr uint32_t kCharSkillManager = 0x184;
+constexpr uint32_t kCharCurrentSkill = 0x2D0;
+constexpr uint32_t kCharRightSkill = 0x2E0;
+constexpr uint32_t kCharHotkeySkills = 0x860; // 10 x uint64
+constexpr uint32_t kCharSkillTarget = 0x1CC;  // Vec3
+constexpr uint32_t kCharTargetUnit = 0x290;
+constexpr uint32_t kSkillGuid = 0x180;
+
 // --- damage, experience ------------------------------------------------------------------------
 // 0x499750: CCharacter::TakeDamage, the target-side funnel for weapon hits (0x4A2380 computes
 // the roll, armor and crits, then calls it), missiles (0x50DA60), effects (0x5E2270, 0x4AAF30):

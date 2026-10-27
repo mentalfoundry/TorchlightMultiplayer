@@ -31,7 +31,9 @@ class Session;
 //   teleport area [min distance]  (into the nearest trigger area not fired yet)   expect area waiting|fired|unfired
 //   expect quest <name> [state]   expect questdone <name>   killquest [approach]   key shift down|up
 //   share node [min]  (send our nearest unspawned monster group's position)   teleport shared
-//   hardcore on|off  (this character, in memory)
+//   hardcore on|off  (this character, in memory)   skill right|slot <n>  (use it like player input)
+//   expect looks  (every monster copy here has its owner's look)
+//   expect castsent <n> | castplayed <n>  (our casts sent / other players' casts shown here, since mark)
 //   walkto node [min distance]  (the nearest monster group not spawned yet)   teleport node [min]   teleport monster <min distance from the host>   teleport player <slot>
 //   expect dead|alive          expect town|dungeon       expect samelevel <slot>
 //   dump <tag>                 shot <tag>                console <command line> (cheats allowed)
