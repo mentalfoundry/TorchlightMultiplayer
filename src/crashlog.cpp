@@ -1,4 +1,4 @@
-// Logs access violations (with the faulting address and likely call stack) to TLMP.log.
+// Logs access violations (with the faulting address and likely call stack) to the TLMP log.
 // Uses a vectored handler so it runs before the game's own unhandled-exception filter;
 // it never handles the exception, only records it.
 

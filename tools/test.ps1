@@ -62,7 +62,7 @@ Start-Sleep -Seconds 1
 $out = Join-Path $Game 'tlmp_test'
 if (Test-Path $out) { Copy-Item "$out\*" $run -Recurse -Force }
 foreach ($p in $procs) {
-  $log = Join-Path $Game "TLMP_$($p.Id).log"
+  $log = Join-Path $Game "TLMP_logs\TLMP_$($p.Id).log"
   if (Test-Path $log) { Copy-Item $log $run }
 }
 Get-ChildItem $run -Recurse -Filter *.bmp | ForEach-Object {

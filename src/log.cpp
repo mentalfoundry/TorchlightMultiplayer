@@ -18,10 +18,17 @@ void open()
     return;
 
   // One log per process so several local instances (used for testing) don't clobber
-  // each other.
-  char name[64];
-  std::snprintf(name, sizeof(name), "TLMP_%lu.log", GetCurrentProcessId());
-  g_file = std::fopen(name, "w");
+  // each other, in TLMP_logs next to Torchlight.exe.
+  wchar_t dir[MAX_PATH];
+  DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
+  while (n > 0 && dir[n - 1] != L'\\')
+    n--;
+  dir[n] = 0;
+  wchar_t name[MAX_PATH + 64];
+  std::swprintf(name, MAX_PATH + 64, L"%lsTLMP_logs", dir);
+  CreateDirectoryW(name, nullptr); // fine if it exists
+  std::swprintf(name, MAX_PATH + 64, L"%lsTLMP_logs\\TLMP_%lu.log", dir, GetCurrentProcessId());
+  g_file = _wfopen(name, L"w");
 }
 
 void close()

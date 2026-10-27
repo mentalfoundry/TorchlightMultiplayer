@@ -47,7 +47,7 @@ its cheat commands are refused; only HELP, CLS, FPS, ROOM, SHOWUI, HIDEUI and AC
 Chat and names are UTF-8. The chat box and HUD fonts can show Latin-1 (e.g. é, ü, ñ); the console font also
 shows Greek and Cyrillic. No shipped font has Chinese/Japanese/Korean glyphs.
 
-Logs: `TLMP_<pid>.log` in the game folder (crashes are logged there too).
+Logs: `TLMP_logs\TLMP_<pid>.log` in the game folder (crashes are logged there too).
 
 Testing aids: `-tlmp-mirror` shows your own character as a remote player 2 units away.
 
