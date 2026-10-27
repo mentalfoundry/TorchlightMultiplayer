@@ -9,6 +9,7 @@ expect avatar 1 timeout=60
 expect avatar 2 timeout=60
 wait 3
 expect looks timeout=30
+expect copyscale 2.5 timeout=20
 dump start
 walkto player 0 timeout=60
 sync gathered timeout=120

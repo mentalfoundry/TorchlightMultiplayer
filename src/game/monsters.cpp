@@ -1222,6 +1222,20 @@ bool scaleRange(float* lo, float* hi)
   return any;
 }
 
+bool copyScaleRange(float* lo, float* hi)
+{
+  bool any = false;
+  for (const auto& [id, m] : g_mirrors)
+  {
+    if (!m.puppet.unit || m.dead)
+      continue;
+    *lo = any ? std::min(*lo, m.scale) : m.scale;
+    *hi = any ? std::max(*hi, m.scale) : m.scale;
+    any = true;
+  }
+  return any;
+}
+
 unsigned copiesWithoutLook()
 {
   unsigned n = 0;

@@ -60,6 +60,8 @@ void discardOwn();
 void setHealthPerPlayer(float perPlayer);
 // Test mode: the range of party multipliers on the monsters this machine runs (false: none).
 bool scaleRange(float* lo, float* hi);
+// Test mode: the same for the copies shown here (as their owner reported).
+bool copyScaleRange(float* lo, float* hi);
 // Copies built from the monster's type alone so far (their look -- names, champions, health -- not
 // in yet). Test mode.
 unsigned copiesWithoutLook();

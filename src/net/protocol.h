@@ -15,7 +15,7 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 27;
+constexpr uint16_t kProtocolVersion = 28;
 constexpr int kMaxPlayers = 4;
 constexpr uint8_t kInvalidSlot = 0xFF;
 constexpr int kEquipSlots = 12; // CInventory slots 0..11 are the equipment slots
@@ -133,6 +133,11 @@ struct PlayerState
   float petHealth = 0.0f;
   uint32_t petMaxHealth = 0;
   bool hardcore = false; // a hardcore death is final: the party stops waiting for them
+  // Character level and base stats: the stand-in gets them, so monsters' hits on it (armor, dodge,
+  // block are rolled against it on the floor's owner) are rolled against the real character.
+  uint16_t level = 0;
+  uint16_t strength = 0, dexterity = 0, magic = 0, defense = 0;
+  uint32_t armor = 0;
 };
 
 class Writer
@@ -253,6 +258,12 @@ inline void writeState(Writer& w, const PlayerState& s)
   w.f32(s.health);
   w.u32(s.maxHealth);
   w.u8((s.dead ? 1 : 0) | (s.hardcore ? 2 : 0));
+  w.u16(s.level);
+  w.u16(s.strength);
+  w.u16(s.dexterity);
+  w.u16(s.magic);
+  w.u16(s.defense);
+  w.u32(s.armor);
 }
 
 inline PlayerState readState(Reader& r)
@@ -281,6 +292,12 @@ inline PlayerState readState(Reader& r)
   uint8_t flags = r.u8();
   s.dead = (flags & 1) != 0;
   s.hardcore = (flags & 2) != 0;
+  s.level = r.u16();
+  s.strength = r.u16();
+  s.dexterity = r.u16();
+  s.magic = r.u16();
+  s.defense = r.u16();
+  s.armor = r.u32();
   return s;
 }
 

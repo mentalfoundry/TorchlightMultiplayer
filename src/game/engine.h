@@ -46,6 +46,13 @@ constexpr uint32_t kUnitAIState = 0x284;      // CCharacter: int AI state; 5 = d
 constexpr int kAIStateDying = 5;
 constexpr int kAIStateDead = 6;
 constexpr uint32_t kUnitAlignment = 0x28C;    // CBaseUnit: raw alignment (read via GetAlignment)
+// CCharacter base stats (console STRENGTH etc. 0x488410..; class defaults 0x4D8580): strength +0x3AC,
+// dexterity +0x3A8, magic +0x3B4, defense +0x3B0, base armor +0x3A4; unspent points +0x3DC.
+constexpr uint32_t kCharStrength = 0x3AC;
+constexpr uint32_t kCharDexterity = 0x3A8;
+constexpr uint32_t kCharMagic = 0x3B4;
+constexpr uint32_t kCharDefense = 0x3B0;
+constexpr uint32_t kCharBaseArmor = 0x3A4;
 constexpr uint32_t kUnitLevel = 0xF0;         // CCharacter: int level (CMonster ctor 0x4D5C60 stores max(arg, existing))
 constexpr uint32_t kUnitHealth = 0x394;       // CCharacter: float current health (max = int +0x398 + int +0x39C)
 // 0x4901E0: CCharacter::GetMaxHealth() -- (base +0x398 + +0x39C) scaled by stat 0x14 (%) plus stat 5

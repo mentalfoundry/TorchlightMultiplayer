@@ -100,7 +100,8 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Skills and spells on other machines (cast for show by the player's stand-in), summons | done, rig-tested |
 | Summoned minions in sync (copies follow the real ones; hits on copies reach the real minion) | done, rig-tested |
 | Party difficulty scaling (monster health per player, host setting) | done, rig-tested |
-| Stand-in stats (remote players are level-1 characters wearing the real gear) | not started |
+| Stand-in level and base stats (so monsters' hit rolls use the real defenses) | done, rig-tested |
+| Stand-in passive skills and active buffs | not started |
 | Town portals and waypoints for other players | not started |
 | Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |
 

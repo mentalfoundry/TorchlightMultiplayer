@@ -320,6 +320,12 @@ bool readLocalPlayerState(net::PlayerState& out)
   int ai = engine::field<int>(me, engine::kUnitAIState);
   out.dead = ai == engine::kAIStateDying || ai == engine::kAIStateDead;
   out.hardcore = engine::field<uint8_t>(me, engine::kPlayerHardcore) != 0;
+  out.level = static_cast<uint16_t>(engine::field<int>(me, engine::kUnitLevel));
+  out.strength = static_cast<uint16_t>(engine::field<int>(me, engine::kCharStrength));
+  out.dexterity = static_cast<uint16_t>(engine::field<int>(me, engine::kCharDexterity));
+  out.magic = static_cast<uint16_t>(engine::field<int>(me, engine::kCharMagic));
+  out.defense = static_cast<uint16_t>(engine::field<int>(me, engine::kCharDefense));
+  out.armor = static_cast<uint32_t>(engine::field<int>(me, engine::kCharBaseArmor));
   const float* m = reinterpret_cast<const float*>(player + engine::kUnitTransform);
   for (int r = 0; r < 3; r++)
     for (int c = 0; c < 3; c++)
@@ -521,6 +527,24 @@ static void spawnPet(uint8_t slot, engine::Level* level)
 // Shows the remote character's health on its stand-in (hover health bar, and what monsters see).
 // Max health comes from the base fields, which on a stand-in nothing else sets; the stand-in's
 // own stat bonuses are tiny compared to the real character's, so the max shown is the real one.
+// The real character's level and base stats on its stand-in (see PlayerState).
+static void applyStats(engine::Unit* unit, const net::PlayerState& s)
+{
+  if (!unit || !s.level)
+    return;
+  auto set = [unit](uint32_t offset, int value) {
+    auto* f = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(unit) + offset);
+    if (*f != value)
+      *f = value;
+  };
+  set(engine::kUnitLevel, s.level);
+  set(engine::kCharStrength, s.strength);
+  set(engine::kCharDexterity, s.dexterity);
+  set(engine::kCharMagic, s.magic);
+  set(engine::kCharDefense, s.defense);
+  set(engine::kCharBaseArmor, static_cast<int>(s.armor));
+}
+
 void applyVitals(engine::Unit* unit, float health, uint32_t maxHealth)
 {
   if (!unit || !maxHealth)
@@ -675,6 +699,7 @@ static void updateAvatars()
     {
       if (a.player.unit && steer(a.player, {a.state.pos[0], a.state.pos[1], a.state.pos[2]}))
         applyFacing(a.player, a.state.rot);
+      applyStats(a.player.unit, a.state);
       applyVitals(a.player.unit, a.state.health, a.state.maxHealth);
     }
     if (a.pet.unit)

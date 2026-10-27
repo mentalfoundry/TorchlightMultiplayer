@@ -33,7 +33,7 @@ class Session;
 //   share node [min]  (send our nearest unspawned monster group's position)   teleport shared
 //   hardcore on|off  (this character, in memory)   skill right|slot <n>  (use it like player input)
 //   expect looks  (every monster copy here has its owner's look)
-//   expect monsterscale <x>  (party health multiplier on the monsters this machine runs)
+//   expect monsterscale <x> | copyscale <x>  (party health multiplier on the monsters run / copies here)
 //   expect minioncopies <slot> <n> | nominioncopies <slot>  (copies of that player's minions here)
 //   expect minionhurt (ours)   hitminioncopy <slot> [damage]   killminion  (test only)
 //   expect castsent <n> | castplayed <n>  (our casts sent / other players' casts shown here, since mark)

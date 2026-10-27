@@ -471,6 +471,17 @@ bool slotActive(uint8_t s)
 
 // --- dumps ---------------------------------------------------------------------------------------
 
+// Level and base stats, as stand-ins get them (PlayerState).
+static std::string statsJson(engine::Unit* u)
+{
+  char b[128];
+  std::snprintf(b, sizeof(b), ",\"stats\":[%d,%d,%d,%d,%d,%d]", engine::field<int>(u, engine::kUnitLevel),
+                engine::field<int>(u, engine::kCharStrength), engine::field<int>(u, engine::kCharDexterity),
+                engine::field<int>(u, engine::kCharMagic), engine::field<int>(u, engine::kCharDefense),
+                engine::field<int>(u, engine::kCharBaseArmor));
+  return b;
+}
+
 void dump(const std::string& tag)
 {
   std::ostringstream o;
@@ -514,7 +525,7 @@ void dump(const std::string& tag)
     Vec3 p = unitPosition(m);
     o << ",\"me\":{\"x\":" << p.x << ",\"z\":" << p.z << ",\"health\":" << engine::field<float>(m, engine::kUnitHealth)
       << ",\"max\":" << engine::GetMaxHealth(m) << ",\"xp\":" << myXp() << ",\"dead\":" << (isDeadUnit(m) ? "true" : "false")
-      << ",\"items\":" << backpackItems() << ",\"name\":\"" << jsonEscape(unitName(m)) << "\"}";
+      << ",\"items\":" << backpackItems() << ",\"name\":\"" << jsonEscape(unitName(m)) << "\"" << statsJson(m) << "}";
   }
   if (engine::Unit* m = me())
   {
@@ -546,7 +557,7 @@ void dump(const std::string& tag)
       Vec3 p = unitPosition(a);
       o << ",\"x\":" << p.x << ",\"z\":" << p.z << ",\"health\":" << engine::field<float>(a, engine::kUnitHealth)
         << ",\"max\":" << engine::GetMaxHealth(a) << ",\"dead\":" << (isDeadUnit(a) ? "true" : "false") << ",\"name\":\""
-        << jsonEscape(unitName(a)) << "\"";
+        << jsonEscape(unitName(a)) << "\"" << statsJson(a);
     }
     o << ",\"pet\":" << (pet ? "true" : "false") << "}";
   }
@@ -828,10 +839,10 @@ Poll expectCheck(const Step& s, std::string& why)
       return fired == 0 ? Poll::Done : Poll::Fail;
     return (want == "fired" ? fired > 0 : waiting) ? Poll::Done : Poll::Wait;
   }
-  if (what == "monsterscale") // monsterscale <x>: every monster this machine runs has party multiplier x
+  if (what == "monsterscale" || what == "copyscale") // <x>: every monster run / copy shown here is at x
   {
     float lo = 0.0f, hi = 0.0f, want = floatArg(s, 2, 1.0f);
-    if (!monsters::scaleRange(&lo, &hi))
+    if (!(what == "monsterscale" ? monsters::scaleRange(&lo, &hi) : monsters::copyScaleRange(&lo, &hi)))
     {
       why = "no monsters run here";
       return Poll::Wait;
