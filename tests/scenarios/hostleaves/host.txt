@@ -1,0 +1,8 @@
+# The host leaves mid-game: the client's session ends cleanly and it plays on alone (see client.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+wait 3
+sync bye timeout=60
+quit

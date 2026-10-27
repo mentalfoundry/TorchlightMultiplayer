@@ -17,6 +17,7 @@ struct Config
   NetMode mode = NetMode::Off;
   std::string address = "127.0.0.1"; // client: host to connect to
   uint16_t port = 27960;
+  bool upnp = true;            // host: open the port on the router with UPnP ([net] upnp; off in test mode)
   std::string playerName = "Adventurer";
   float healthPerPlayer = 0.5f; // host: monster health added per player beyond the first ([party])
   uint32_t devWorldSeed = 0; // -tlmp-worldseed N: act as if a host sent N (testing only)

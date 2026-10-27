@@ -18,7 +18,17 @@ Install does three things:
 
 ## Running
 
-Set `TLMP.ini` in the game folder, or use these flags:
+On the title screen, **Host Co-op** starts a session; friends click **Join Co-op**, type the host's
+address (`IP` or `IP:port`) and **Connect**, then everyone clicks Continue. In a session the button
+reads **Leave Co-op**. The line above the buttons says what the session is doing.
+
+Playing over the internet: when you host, the game asks your router to open UDP port 27960 (UPnP)
+and tells you the address friends should use. If your router doesn't do UPnP, it tells you so:
+forward UDP 27960 to your PC in the router's settings, and give friends your public IP. (A VPN such
+as Tailscale or ZeroTier also works: join with the host's VPN address.) If the host leaves, everyone
+else is told and keeps playing on their own; they can join again later.
+
+`TLMP.ini` in the game folder or these flags can also start a session directly:
 
 ```
 Torchlight.exe -tlmp-host [port]                          # host (slot 0), default UDP 27960
@@ -105,6 +115,7 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Stand-in skills at the real levels (passives included); buffs come with replayed casts | done, rig-tested |
 | Town portals for other players (shown where cast; anyone can use one to go to town) | done, rig-tested |
 | Waypoints (to another floor: a party trip; to town: alone) | done, rig-tested |
-| Internet play (lobby/launcher, NAT, reconnects, host leaving) | not started |
+| Title-screen Host/Join menu, host leaving ends the session cleanly | done, rig-tested |
+| Internet play: UPnP port opening, manual forwarding fallback | built; not tested on a UPnP router or over the internet |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).

@@ -78,6 +78,7 @@ void Session::stop()
   m_server = nullptr;
   m_localSlot = kInvalidSlot;
   m_players = {};
+  m_mode = NetMode::Off;
   enet_deinitialize();
 }
 
@@ -138,6 +139,8 @@ void Session::handleDisconnect(ENetPeer* peer)
     m_server = nullptr;
     if (m_cb.onWorldSeed)
       m_cb.onWorldSeed(0); // no host any more: fall back to our own world
+    if (m_cb.onHostLost)
+      m_cb.onHostLost();
     return;
   }
 

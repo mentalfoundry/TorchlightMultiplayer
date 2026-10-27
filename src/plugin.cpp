@@ -19,6 +19,8 @@
 #include "game/triggers.h"
 #include "log.h"
 #include "net/session.h"
+#include "net/upnp.h"
+#include "menu.h"
 #include "ogre_abi.h"
 #include "profile.h"
 
@@ -33,6 +35,8 @@ static ogre_abi::RemoveFrameListenerFn g_removeFrameListener = nullptr;
 
 constexpr float kStateSendInterval = 1.0f / 20.0f;
 
+static void upnpReport();
+
 class NetFrameListener final : public ogre_abi::FrameListener
 {
 public:
@@ -41,6 +45,8 @@ public:
     g_session.poll();
     game::setHostRole(g_session.isHost() && g_session.isConnected());
     game::tick(evt.timeSinceLastFrame);
+    upnpReport();
+    menu::tick();
     game::floor::tick();
     game::monsters::tick();
     game::combat::tick();
@@ -67,6 +73,12 @@ public:
     }
 
     net::PlayerInfo info = game::localPlayerInfo();
+    // A session started since (from the title screen): what we "sent" before went nowhere.
+    if (g_session.isConnected() != m_infoSessionUp)
+    {
+      m_infoSessionUp = g_session.isConnected();
+      m_sentInfo = net::PlayerInfo{};
+    }
     if (!(info == m_sentInfo))
     {
       m_sentInfo = info;
@@ -128,6 +140,7 @@ private:
   float m_sendAccum = 0.0f;
   uint32_t m_tick = 0;
   net::PlayerInfo m_sentInfo;
+  bool m_infoSessionUp = false;
 };
 
 static NetFrameListener g_frameListener;
@@ -151,6 +164,88 @@ static bool attachToOgre()
 }
 
 static void dispatch(uint8_t from, net::Msg type, net::Reader& r);
+
+static net::Session::Callbacks g_callbacks;
+
+// The name others see: the character's, unless TLMP.ini / the command line set one.
+static std::string sessionName()
+{
+  if (g_config.playerName != "Adventurer" && !g_config.playerName.empty())
+    return g_config.playerName;
+  std::string character = game::localPlayerInfo().charName;
+  return character.empty() ? g_config.playerName : character;
+}
+
+// Starts hosting, or joining "host[:port]". False if a session is already running or it failed.
+static bool beginSession(NetMode mode, const std::string& address)
+{
+  if (g_session.isActive())
+    return false;
+  Config c = g_config;
+  c.mode = mode;
+  c.playerName = sessionName();
+  if (mode == NetMode::Client)
+  {
+    c.address = address;
+    if (size_t colon = address.rfind(':'); colon != std::string::npos)
+    {
+      c.address = address.substr(0, colon);
+      c.port = static_cast<uint16_t>(std::atoi(address.c_str() + colon + 1));
+    }
+    g_config.address = address;
+  }
+  g_session.setPartyRules(c.healthPerPlayer);
+  if (mode == NetMode::Host)
+    game::monsters::setHealthPerPlayer(c.healthPerPlayer);
+  if (!g_session.start(c, g_callbacks))
+  {
+    game::showMessage(mode == NetMode::Host ? "Could not start hosting (is the port in use?)" : "Could not connect.", 6.0f);
+    return false;
+  }
+  g_config.mode = mode;
+  TLMP_LOG("session: %s as '%s'", mode == NetMode::Host ? "hosting" : ("joining " + address).c_str(), c.playerName.c_str());
+  // Test runs never touch the router (they host on every run).
+  if (mode == NetMode::Host && c.upnp && c.testScript.empty())
+    net::upnp::open(c.port);
+  return true;
+}
+
+// Ends the session from this side (the others see us leave); this game goes on alone.
+static void leaveSession(const char* why)
+{
+  if (!g_session.isActive())
+    return;
+  TLMP_LOG("session: ending (%s)", why);
+  game::onHostWorldSeed(0);
+  game::endSession();
+  game::loot::endSession();
+  game::floor::endSession();
+  g_session.stop();
+  net::upnp::close();
+  g_config.mode = NetMode::Off;
+}
+
+static std::string sessionStatus()
+{
+  char b[160];
+  if (!g_session.isActive())
+    return "Co-op: not in a session";
+  if (g_session.isHost())
+  {
+    net::upnp::Status u = net::upnp::status();
+    std::string reach = u.state == net::upnp::State::Open && !u.externalIp.empty()
+                          ? "friends join at " + u.externalIp + ":" + std::to_string(g_config.port)
+                        : u.state == net::upnp::State::Working ? "opening the port on your router..."
+                        : u.state == net::upnp::State::Open    ? "port " + std::to_string(g_config.port) + " is open"
+                        : "forward UDP " + std::to_string(g_config.port) + " on your router for friends to join";
+    std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s); %s", g_session.playerCount(), reach.c_str());
+    return b;
+  }
+  if (!g_session.isConnected())
+    return "Co-op: connecting to " + g_config.address + "...";
+  std::snprintf(b, sizeof(b), "Co-op: joined %s, %d player(s)", g_config.address.c_str(), g_session.playerCount());
+  return b;
+}
 
 static void start()
 {
@@ -185,7 +280,7 @@ static void start()
     return;
   }
 
-  net::Session::Callbacks cb;
+  net::Session::Callbacks& cb = g_callbacks;
   cb.onPlayerJoined = [](uint8_t slot, const std::string& name) { game::onRemoteJoined(slot, name); };
   cb.onPlayerLeft = [](uint8_t slot) {
     game::onRemoteLeft(slot);
@@ -194,6 +289,14 @@ static void start()
   cb.onPlayerState = [](uint8_t slot, const net::PlayerState& st) { game::onRemoteState(slot, st); };
   cb.onPlayerInfo = [](uint8_t slot, const net::PlayerInfo& info) { game::onRemoteInfo(slot, info); };
   cb.onWorldSeed = [](uint32_t seed) { game::onHostWorldSeed(seed); };
+  cb.onHostLost = [] {
+    // The session is over: this game goes on alone. What the floor shows becomes its own (copies
+    // get their AI back once we're no client), others' dropped items leave, settings are ours again.
+    game::endSession();
+    game::loot::endSession();
+    game::floor::endSession();
+    game::showHostLeft();
+  };
   cb.onPartyRules = [](float healthPerPlayer) { game::monsters::setHealthPerPlayer(healthPerPlayer); };
   cb.onGameMessage = [](uint8_t from, net::Msg type, net::Reader& r) { dispatch(from, type, r); };
   game::monsters::attach(&g_session);
@@ -211,11 +314,22 @@ static void start()
     game::showChat(game::displayName(slot, g_session.player(slot).name), text);
   };
   game::setChatSender([](const std::string& text) { g_session.sendChat(text); });
-  g_session.setPartyRules(g_config.healthPerPlayer);
-  if (g_config.mode == NetMode::Host)
-    game::monsters::setHealthPerPlayer(g_config.healthPerPlayer);
-  g_session.start(g_config, std::move(cb));
+  // TLMP.ini / command line may start a session right away; otherwise the title screen's co-op
+  // buttons do (menu.cpp).
+  if (g_config.mode != NetMode::Off)
+    beginSession(g_config.mode, g_config.address);
   game::autotest::start(&g_session, g_config.testScript);
+  menu::init(menu::Actions{
+    [] { return beginSession(NetMode::Host, ""); },
+    [](const std::string& address) {
+      WritePrivateProfileStringA("net", "address", address.c_str(), ".\\TLMP.ini"); // offered next time
+      return beginSession(NetMode::Client, address);
+    },
+    [] { leaveSession("left from the title screen"); },
+    [] { return sessionStatus(); },
+    [] { return g_session.isActive(); },
+    [] { return g_config.address; },
+  });
 }
 
 // Game-module messages, also the ones unwrapped from a Relay.
@@ -279,6 +393,27 @@ static void dispatch(uint8_t from, net::Msg type, net::Reader& r)
   }
 }
 
+// Host: tells the player, once in the game, whether friends can reach them over the internet.
+static void upnpReport()
+{
+  static net::upnp::State shown = net::upnp::State::Idle;
+  net::upnp::Status st = net::upnp::status();
+  if (st.state == shown || st.state == net::upnp::State::Working || st.state == net::upnp::State::Idle ||
+      !game::playing())
+    return;
+  shown = st.state;
+  char line[160];
+  if (st.state == net::upnp::State::Open && !st.externalIp.empty())
+    std::snprintf(line, sizeof(line), "Friends can join you at %s (port %u).", st.externalIp.c_str(), g_config.port);
+  else if (st.state == net::upnp::State::Open)
+    std::snprintf(line, sizeof(line), "Port %u is open on your router: friends can join with your public IP address.",
+                  g_config.port);
+  else
+    std::snprintf(line, sizeof(line), "Couldn't open the port automatically: forward UDP %u on your router for friends to join.",
+                  g_config.port);
+  game::showMessage(line, 10.0f);
+}
+
 static void stop()
 {
   game::onHostWorldSeed(0); // put the character's own world seed back before the final save
@@ -286,6 +421,7 @@ static void stop()
   game::loot::endSession(); // other players' dropped items leave the ground
   game::floor::endSession();
   g_session.stop();
+  net::upnp::close();
   if (g_root && g_removeFrameListener)
     g_removeFrameListener(g_root, &g_frameListener);
   hooks::uninstall();

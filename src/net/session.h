@@ -36,6 +36,7 @@ public:
     std::function<void(uint8_t slot, const std::string& text)> onChat;
     std::function<void(uint8_t slot, const PlayerInfo& info)> onPlayerInfo;
     std::function<void(uint32_t seed)> onWorldSeed; // client only; 0 = host gone
+    std::function<void()> onHostLost;               // client only: the host left or dropped
     std::function<void(float healthPerPlayer)> onPartyRules; // client only: the host's party settings
     // Message types the session itself doesn't handle, for game modules. The reader is
     // positioned just after the type byte. On a client, fromSlot is always 0 (the host).
@@ -62,6 +63,14 @@ public:
 
   bool isHost() const { return m_mode == NetMode::Host; }
   bool isConnected() const { return m_localSlot != kInvalidSlot; }
+  bool isActive() const { return m_host != nullptr; } // hosting, connected or still connecting
+  int playerCount() const
+  {
+    int n = 0;
+    for (const auto& p : m_players)
+      n += p.active ? 1 : 0;
+    return n;
+  }
   uint8_t localSlot() const { return m_localSlot; }
   const RemotePlayer& player(uint8_t slot) const { return m_players[slot]; }
 

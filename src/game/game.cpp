@@ -1221,6 +1221,22 @@ static void putBackConsoleSettings(uintptr_t settings)
       *slot = g_consoleOriginal[i];
 }
 
+void showMessage(const std::string& text, float seconds)
+{
+  showNotice(text, seconds);
+  showChat("TLMP", text);
+}
+
+bool playing()
+{
+  return inGameplay();
+}
+
+void showHostLeft()
+{
+  showNotice("The host has left the game. You are playing on your own now.", 8.0f);
+}
+
 void endSession()
 {
   g_sessionActive = false;

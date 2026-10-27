@@ -37,6 +37,8 @@ add_library(TLMP SHARED
   src/game/quests.cpp
   src/game/skills.cpp
   src/game/minions.cpp
+  src/net/upnp.cpp
+  src/menu.cpp
   src/game/triggers.cpp
   src/game/party.cpp
   src/game/hooks.cpp

@@ -43,6 +43,12 @@ bool onConsoleLine(const wchar_t* line);
 // blocks cheat commands; endSession restores the player's own settings.
 void enableConsoleForSession();
 void endSession();
+// Client: tells the player the host has gone (the session ended; this game goes on alone).
+void showHostLeft();
+// A message for the player: on screen for `seconds`, and in the chat (console) history.
+void showMessage(const std::string& text, float seconds);
+// In a game (not on the title screen or loading).
+bool playing();
 
 // Bracket the game's settings writer (0x5C5530) so the player's own console settings are
 // what gets saved.

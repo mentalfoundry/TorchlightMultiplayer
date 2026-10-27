@@ -1,0 +1,20 @@
+# The host leaves mid-game: the client is told, its copies of the host's monsters become its own
+# (they fight and drop the client's loot), and it can travel on alone.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+sync bye timeout=60
+expect notice host has left timeout=60
+wait 3
+mark
+teleport monster 0 timeout=20
+killnear timeout=30
+expect lootrolls 1 timeout=10
+mark
+stairs down
+expect newlevel timeout=60
+wait 3
+dump alone
+quit

@@ -14,6 +14,7 @@
 #include "game/triggers.h"
 #include "log.h"
 #include "net/session.h"
+#include "net/upnp.h"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -282,8 +283,9 @@ const Cegui& cegui()
   return c;
 }
 
-// Clicks the named window if it is showing; false if it isn't (yet).
-bool clickWindow(const std::string& name)
+// Clicks the named window if it is showing; false if it isn't (yet). pressOnly: the button goes
+// down now and up with releaseMouse() (a click spanning frames, as a real one does).
+bool clickWindow(const std::string& name, bool pressOnly = false)
 {
   const Cegui& c = cegui();
   if (!c.ok)
@@ -326,8 +328,38 @@ bool clickWindow(const std::string& name)
   }
   c.mousePos(system, x, y);
   c.mouseDown(system, 0);
-  c.mouseUp(system, 0);
+  if (!pressOnly)
+    c.mouseUp(system, 0);
   TLMP_LOG("test: clicked '%s' at (%.0f, %.0f)", name.c_str(), x, y);
+  return true;
+}
+
+void releaseMouse()
+{
+  const Cegui& c = cegui();
+  if (void* system = c.ok ? c.system() : nullptr)
+    c.mouseUp(system, 0);
+}
+
+// Sets a window's text (an edit box's contents, as typing would leave them).
+bool setWindowText(const std::string& name, const std::string& value)
+{
+  const Cegui& c = cegui();
+  static auto setText = reinterpret_cast<void(__thiscall*)(void*, const void*)>(
+    GetProcAddress(GetModuleHandleW(L"CEGUIBase.dll"), "?setText@Window@CEGUI@@QAEXABVString@2@@Z"));
+  void* system = c.ok ? c.system() : nullptr;
+  void* sheet = system ? c.sheet(system) : nullptr;
+  if (!sheet || !setText)
+    return false;
+  alignas(8) unsigned char str[256] = {}, val[256] = {};
+  c.strCtor(str, reinterpret_cast<const unsigned char*>(name.c_str()));
+  void* window = c.search(sheet, str);
+  c.strDtor(str);
+  if (!window || !c.visible(window, false))
+    return false;
+  c.strCtor(val, reinterpret_cast<const unsigned char*>(value.c_str()));
+  setText(window, val);
+  c.strDtor(val);
   return true;
 }
 
@@ -1113,6 +1145,27 @@ Poll run(const Step& s, bool begin, std::string& why)
     why = b;
     return Poll::Done;
   }
+  if (cmd == "clickslow")
+  {
+    // Press now, release on the next frame.
+    static bool pressed = false;
+    if (begin)
+      pressed = false;
+    if (pressed)
+    {
+      releaseMouse();
+      pressed = false;
+      return Poll::Done;
+    }
+    why = "not showing";
+    pressed = clickWindow(s.args.size() > 1 ? s.args[1] : "", true);
+    return Poll::Wait;
+  }
+  if (cmd == "settext" && s.args.size() > 2)
+  {
+    why = "not showing";
+    return setWindowText(s.args[1], restFrom(s, 2)) ? Poll::Done : Poll::Wait;
+  }
   if (cmd == "click")
   {
     if (clock() - g_lastAction < 0.5f)
@@ -1586,6 +1639,15 @@ Poll run(const Step& s, bool begin, std::string& why)
     changeLevel(L"Town", -99);
     return Poll::Done;
   }
+  if (cmd == "upnpprobe")
+  {
+    // Read-only: does a UPnP router answer? (No port is mapped.)
+    std::string detail;
+    bool ok = net::upnp::probe(&detail);
+    why = detail;
+    TLMP_LOG("test: upnp probe: %s", detail.c_str());
+    return ok ? Poll::Done : Poll::Fail;
+  }
   if (cmd == "waypoint" && s.args.size() > 2)
   {
     // Test only: as the waypoint menu does (0x5B6481): ChangeLevel(dungeon, 0, floor, waypoint 1, "", 0).
@@ -1743,7 +1805,7 @@ void tick()
   if (p == Poll::Wait)
     return;
   bool check = s.args[0] == "expect" || s.args[0] == "pickup" || s.args[0] == "killnear" || s.args[0] == "teleport" ||
-               s.args[0] == "skill" || s.args[0] == "learnskill" || s.args[0] == "skilllevel";
+               s.args[0] == "skill" || s.args[0] == "learnskill" || s.args[0] == "skilllevel" || s.args[0] == "upnpprobe";
   if (p == Poll::Fail)
   {
     g_failed++;

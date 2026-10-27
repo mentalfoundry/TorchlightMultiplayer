@@ -1,0 +1,17 @@
+# The title screen's co-op buttons (see host.txt): Join Co-op, type the address, Connect.
+wait 8
+clickslow TLMP_JoinButton timeout=60
+wait 1
+settext TLMP_Address 127.0.0.1 timeout=10
+shot joinbox
+clickslow TLMP_Connect timeout=10
+players 2 timeout=120
+wait 1
+shot joined
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+expect avatar 0 timeout=60
+sync end timeout=60
+quit

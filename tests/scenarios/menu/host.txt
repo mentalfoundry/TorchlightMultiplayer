@@ -1,0 +1,13 @@
+# The title screen's co-op buttons: the game starts with no session; the host clicks Host Co-op.
+wait 4
+shot title
+clickslow TLMP_HostButton timeout=60
+players 2 timeout=120
+wait 1
+shot hosting
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+expect avatar 1 timeout=60
+sync end timeout=60
+quit

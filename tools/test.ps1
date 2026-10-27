@@ -37,13 +37,18 @@ Remove-Item (Join-Path $Game 'tlmp_test') -Recurse -Force -ErrorAction SilentlyC
 
 $exe = Join-Path $Game 'Torchlight.exe'
 $procs = @()
-$procs += Start-Process -FilePath $exe -WorkingDirectory $Game -PassThru -ArgumentList @(
-  '-tlmp-profile', 't1', '-tlmp-host', '-tlmp-name', 'TestHost', '-tlmp-test', "`"$scen\host.txt`"")
+# A scenario folder with a file named "menu" starts the games without -tlmp-host / -tlmp-join:
+# its scripts start the session through the title screen's co-op buttons.
+$menu = Test-Path "$scen\menu"
+$hostArgs = if ($menu) { @() } else { @('-tlmp-host') }
+$procs += Start-Process -FilePath $exe -WorkingDirectory $Game -PassThru -ArgumentList (@(
+  '-tlmp-profile', 't1') + $hostArgs + @('-tlmp-name', 'TestHost', '-tlmp-test', "`"$scen\host.txt`""))
 Start-Sleep -Seconds 5
 for ($i = 1; $i -le $Clients; $i++) {
   $script = if ($i -eq 1 -and -not (Test-Path "$scen\client1.txt")) { "$scen\client.txt" } else { "$scen\client$i.txt" }
-  $procs += Start-Process -FilePath $exe -WorkingDirectory $Game -PassThru -ArgumentList @(
-    '-tlmp-profile', "t$($i + 1)", '-tlmp-join', '127.0.0.1', '-tlmp-name', "TestClient$i", '-tlmp-test', "`"$script`"")
+  $joinArgs = if ($menu) { @() } else { @('-tlmp-join', '127.0.0.1') }
+  $procs += Start-Process -FilePath $exe -WorkingDirectory $Game -PassThru -ArgumentList (@(
+    '-tlmp-profile', "t$($i + 1)") + $joinArgs + @('-tlmp-name', "TestClient$i", '-tlmp-test', "`"$script`""))
   Start-Sleep -Seconds 2
 }
 
