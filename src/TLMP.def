@@ -1,0 +1,5 @@
+LIBRARY TLMP
+EXPORTS
+    dllStartPlugin
+    dllStopPlugin
+    tlmpEarlyAnchor

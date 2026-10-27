@@ -1,0 +1,15 @@
+# Smoke test: both get into the game together and see each other.
+players 2 timeout=90
+wait 4
+shot title
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+wait 8
+dump start
+shot start
+expect avatar 0
+expect owner 0
+sync checked timeout=60
+quit

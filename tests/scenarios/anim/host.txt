@@ -1,0 +1,13 @@
+# Attack/skill animations show on the other machine's copy.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync start timeout=60
+wait 2
+anim Special_Slam
+sync hostanim timeout=30
+sync clientanim timeout=60
+expect anim 1 Special_Gen_Cast
+sync end timeout=60
+quit

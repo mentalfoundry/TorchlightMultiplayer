@@ -1,0 +1,9 @@
+# Session start only (for repeating): both continue their characters and must end up on the same floor.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+expect samelevel 1 timeout=30
+wait 2
+sync end timeout=60
+quit

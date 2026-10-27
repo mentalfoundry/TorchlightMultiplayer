@@ -1,0 +1,18 @@
+# Build output
+/build/
+
+# Test rig runs (logs, dumps, screenshots)
+/tests/runs/
+
+# Reverse-engineering output derived from the game binary (regenerate with the tools in re/)
+/re/ghidra_proj/
+/re/decomp/
+/re/decomp_all/
+/re/*.txt
+/re/*.json
+/re/*.npy
+/re/*.log
+
+# Python
+__pycache__/
+*.pyc

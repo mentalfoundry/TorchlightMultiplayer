@@ -1,0 +1,19 @@
+# Dropped items are shared: the client drops one, the host sees it and picks it up, the client's goes.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync start timeout=60
+sync dropped timeout=60
+expect shared 1 timeout=20
+dump seen
+shot seen
+walkto player 1 timeout=30
+mark
+pickup timeout=20
+expect items 1
+expect noshared
+sync picked timeout=30
+dump after
+sync end timeout=60
+quit

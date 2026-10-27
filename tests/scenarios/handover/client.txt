@@ -1,0 +1,23 @@
+# Floor handover: the host goes to town alone; the client keeps playing and runs the floor meanwhile;
+# the host comes back down, lands on the client's floor and takes it back with everything that changed.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+sync start timeout=60
+sync hostintown timeout=90
+expect owner 1 timeout=30
+walkto monster timeout=40
+mark
+killnear timeout=30
+expect xpgain
+dump whileowner
+sync clientfought timeout=60
+expect owner 0 timeout=120
+wait 8
+sync back timeout=60
+dump back
+shot back
+sync end timeout=60
+quit

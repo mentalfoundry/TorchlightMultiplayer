@@ -1,0 +1,34 @@
+# Both players hold BardRandom; on its floor the host kills the one target (the client stands by it):
+# both quests must count the kill.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+console QUESTACTIVE BardRandom
+wait 2
+sync go1 timeout=60
+mark
+stairs down
+expect newlevel timeout=60
+expect samelevel 1 timeout=60
+wait 6
+sync f1 timeout=60
+sync go2 timeout=60
+mark
+stairs down
+expect newlevel timeout=60
+expect samelevel 1 timeout=60
+wait 6
+sync f2 timeout=60
+dump before
+expect quest BardRandom 1 timeout=10
+killquest approach timeout=30
+sync near timeout=60
+killquest timeout=30
+wait 3
+sync killed timeout=60
+dump after
+expect questdone BardRandom timeout=15
+shot after
+sync end timeout=60
+quit

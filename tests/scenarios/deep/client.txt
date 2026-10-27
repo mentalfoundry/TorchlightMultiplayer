@@ -1,0 +1,32 @@
+# Repeated party travel downwards; records each floor (monsters, monster groups) on both machines.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+mark
+sync go1 timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 6
+sync f1 timeout=60
+dump f1
+walkto player 0 timeout=40
+mark
+sync go2 timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 6
+sync f2 timeout=60
+dump f2
+walkto player 0 timeout=40
+mark
+sync go3 timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 6
+sync f3 timeout=60
+dump f3
+sync end timeout=60
+quit

@@ -1,0 +1,13 @@
+# Shift held while the host continues (the game's Shift+Continue developer room, engine.h
+# kTestRoomShiftCheck): the host must still start on its save's floor, with the client.
+players 2 timeout=90
+key shift down
+click ContinueLast timeout=90
+wait 1
+key shift up
+ingame timeout=90
+sync ingame timeout=120
+expect samelevel 1 timeout=30
+wait 2
+sync end timeout=60
+quit

@@ -1,0 +1,38 @@
+# Combat across games: client hits count on the host, monsters hurt the client, kills give XP to both.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+mark
+sync start timeout=60
+walkto monster timeout=40
+# (Monsters hitting the client is covered by the 'apart' scenario: some monsters, like ratlin
+# foremen, don't fight themselves, so a single poked monster may never hit back.)
+mark
+killnear timeout=30
+expect xpgain
+# Loot is per player: our own game must roll our own loot for every kill we share in. What a roll
+# drops is random -- often nothing, which is fine -- so the check is the rolls, not the ground.
+killnear timeout=30
+killnear timeout=30
+killnear timeout=30
+killnear timeout=30
+wait 2
+expect lootrolls 5 timeout=10
+shot loot
+sync clientkilled timeout=60
+sync dump1 timeout=30
+dump afterclientkill
+shot afterclientkill
+mark
+sync hostready timeout=60
+teleport player 0 timeout=20
+sync clientnear timeout=30
+sync dump2 timeout=120
+expect xpgain
+dump afterhostkill
+shot afterhostkill
+sync end timeout=60
+quit

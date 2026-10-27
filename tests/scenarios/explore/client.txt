@@ -1,0 +1,31 @@
+# On a fresh floor the client walks off to a monster group that hasn't appeared yet; the host's game
+# (which runs the floor) should spawn it for the client, and the client should see copies of it.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+mark
+sync together timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 5
+walkto player 0 timeout=40
+mark
+sync together2 timeout=60
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 5
+mark
+sync start timeout=60
+dump before
+teleport node 25
+wait 4
+sync clientthere timeout=30
+expect moremonsters timeout=20
+shot explored
+sync dump timeout=30
+dump explored
+sync end timeout=60
+quit

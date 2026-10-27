@@ -1,0 +1,20 @@
+# Party travel: the host takes the stairs down; the client is next to it, so after the countdown both
+# arrive on the same new floor, run by the host, with the client's copies of its monsters.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+mark
+sync together timeout=60
+expect notice Leaving in timeout=20
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+expect owner 0 timeout=30
+wait 6
+sync arrived timeout=60
+dump arrived
+shot arrived
+sync end timeout=60
+quit

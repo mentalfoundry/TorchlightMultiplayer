@@ -1,0 +1,10 @@
+# Players far apart: the host stays put; the client fights a monster well away from the host. On the
+# host's game that monster must still be awake (think, fight back), not frozen because the host is far.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync start timeout=60
+sync fought timeout=120
+sync end timeout=60
+quit

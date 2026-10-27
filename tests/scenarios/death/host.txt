@@ -1,0 +1,21 @@
+# Death: the client dies; the host sees its stand-in die and no death screen of its own; the client
+# resurrects ("here") and the host sees it come back.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+mark
+sync start timeout=60
+sync died timeout=60
+expect notice has died timeout=20
+expect avatardead 1 timeout=20
+wait 8
+shot clientdead
+dump clientdead
+expect alive
+sync revived timeout=180
+expect avatar 1 timeout=30
+expect notice is back timeout=30
+dump revived
+sync end timeout=60
+quit
