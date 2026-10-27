@@ -4,6 +4,7 @@
 #include "game/floor.h"
 #include "game/loot.h"
 #include "game/quests.h"
+#include "game/minions.h"
 #include "game/skills.h"
 #include "game/spawns.h"
 #include "game/monsters.h"
@@ -33,6 +34,7 @@ static void __fastcall levelDtorHook(void* self, void* edx)
   game::floor::onLevelDestroyed(self); // first: its snapshot needs the level's monsters and seed
   game::monsters::onLevelDestroyed(self);
   game::loot::onLevelDestroyed(self);
+  game::minions::onLevelDestroyed(self);
   game::onLevelDestroyed(self);
   g_levelDtor(self, edx);
 }

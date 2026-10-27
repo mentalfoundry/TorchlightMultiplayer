@@ -1,6 +1,7 @@
 #include "game/combat.h"
 #include "game/floor.h"
 #include "game/internal.h"
+#include "game/minions.h"
 #include "game/monsters.h"
 #include "game/skills.h"
 #include "log.h"
@@ -29,6 +30,7 @@ enum VictimKind : uint8_t
 {
   kVictimPlayer = 0,
   kVictimPet = 1,
+  kVictimMinion = 2, // + the minion's index in its player's report (minions.cpp)
 };
 
 static const char* const kAttackerNames[] = {"player", "pet", "summon", "other"};
@@ -155,7 +157,8 @@ static void onPlayerDamage(net::Reader& r)
     g_count.dropped++;
     return;
   }
-  auto* victim = reinterpret_cast<engine::Unit*>(victimKind == kVictimPet ? localPet() : localPlayer());
+  auto* victim = victimKind >= kVictimMinion ? minions::localMinion(static_cast<uint8_t>(victimKind - kVictimMinion))
+                 : reinterpret_cast<engine::Unit*>(victimKind == kVictimPet ? localPet() : localPlayer());
   if (!victim)
   {
     g_count.dropped++;
@@ -168,7 +171,7 @@ static void onPlayerDamage(net::Reader& r)
   hit.attacker = attacker;
   if (++g_count.taken <= kDetailedLogs)
     TLMP_LOG("combat: [client] host monster %u (copy %p) hit my %s for %.1f (flags %x)", attackerId, attacker,
-             victimKind == kVictimPet ? "pet" : "character", hit.damage, hit.flags);
+             victimKind >= kVictimMinion ? "minion" : victimKind == kVictimPet ? "pet" : "character", hit.damage, hit.flags);
   applyHit(victim, hit);
 }
 
@@ -178,21 +181,32 @@ static bool hostHitsStandIn(engine::Unit* target, const Hit& hit)
 {
   bool isPet = false;
   int slot = avatarSlotOf(target, &isPet);
+  uint8_t victimKind = isPet ? kVictimPet : kVictimPlayer;
   if (slot < 0)
-    return true;
+  {
+    // A copy of a remote player's minion: the hit goes to the real minion (a summon not matched
+    // to one yet takes nothing).
+    uint8_t mSlot = 0, index = 0;
+    if (!minions::copyOf(target, &mSlot, &index))
+      return true;
+    if (index == 0xFF)
+      return false;
+    slot = mSlot;
+    victimKind = static_cast<uint8_t>(kVictimMinion + index);
+  }
   int ai = engine::field<int>(target, engine::kUnitAIState);
   if (ai == engine::kAIStateDying || ai == engine::kAIStateDead)
     return false; // its player is dead already
   uint32_t attackerId = monsters::trackedId(hit.attacker);
   net::Writer w(Msg::PlayerDamage);
   w.u32(levelId(currentLevel()));
-  w.u8(isPet ? kVictimPet : kVictimPlayer);
+  w.u8(victimKind);
   w.u32(attackerId);
   writeHit(w, hit);
   floor::sendTo(static_cast<uint8_t>(slot), w, true);
   if (++g_count.forwarded <= kDetailedLogs)
     TLMP_LOG("combat: [host] monster %u (%p) hit slot %d's %s for %.1f -> owner", attackerId, hit.attacker, slot,
-             isPet ? "pet" : "character", hit.damage);
+             victimKind >= kVictimMinion ? "minion" : isPet ? "pet" : "character", hit.damage);
   return false; // the stand-in itself is never hurt
 }
 

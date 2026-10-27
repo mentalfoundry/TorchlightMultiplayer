@@ -1,0 +1,18 @@
+# Minions in sync: the client summons a skeleton (the Summon Skeleton spell, learned for the test) by a
+# monster group far from the host. The host shows one copy of it, and a monster's hit on that copy
+# (dealt by the test, as the game would) reaches the client's real skeleton. When the skeleton dies, the copy dies too.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+console GOD
+sync cast timeout=90
+expect minioncopies 1 1 timeout=20
+wait 3
+dump copies
+hitminioncopy 1 5 timeout=20
+sync hurt timeout=90
+sync killed timeout=60
+expect nominioncopies 1 timeout=20
+sync end timeout=60
+quit

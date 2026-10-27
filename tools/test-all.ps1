@@ -26,6 +26,7 @@ $suite = [ordered]@{
   party4      = @('start', 'arrived')
   skills      = @()
   summon      = @()
+  minions     = @()
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

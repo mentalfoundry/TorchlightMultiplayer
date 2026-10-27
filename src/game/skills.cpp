@@ -2,6 +2,7 @@
 #include "game/diag.h"
 #include "game/floor.h"
 #include "game/internal.h"
+#include "game/minions.h"
 #include "game/monsters.h"
 #include "game/vsstring.h"
 #include "log.h"
@@ -78,7 +79,10 @@ bool isShowOnly(const void* unit)
   if (isAvatarUnit(unit))
     return true;
   const void* owner = engine::field<void*>(unit, kMinionOwner);
-  return owner && isAvatarUnit(owner);
+  if (owner && isAvatarUnit(owner))
+    return true;
+  uint8_t slot = 0, index = 0;
+  return minions::copyOf(unit, &slot, &index);
 }
 
 static std::string skillName(void* skill)

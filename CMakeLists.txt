@@ -36,6 +36,7 @@ add_library(TLMP SHARED
   src/game/autotest.cpp
   src/game/quests.cpp
   src/game/skills.cpp
+  src/game/minions.cpp
   src/game/triggers.cpp
   src/game/party.cpp
   src/game/hooks.cpp

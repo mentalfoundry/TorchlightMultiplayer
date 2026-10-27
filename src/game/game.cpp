@@ -521,7 +521,7 @@ static void spawnPet(uint8_t slot, engine::Level* level)
 // Shows the remote character's health on its stand-in (hover health bar, and what monsters see).
 // Max health comes from the base fields, which on a stand-in nothing else sets; the stand-in's
 // own stat bonuses are tiny compared to the real character's, so the max shown is the real one.
-static void applyVitals(engine::Unit* unit, float health, uint32_t maxHealth)
+void applyVitals(engine::Unit* unit, float health, uint32_t maxHealth)
 {
   if (!unit || !maxHealth)
     return;

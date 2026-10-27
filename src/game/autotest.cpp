@@ -8,6 +8,7 @@
 #include "game/loot.h"
 #include "game/monsters.h"
 #include "game/party.h"
+#include "game/minions.h"
 #include "game/skills.h"
 #include "game/spawns.h"
 #include "game/triggers.h"
@@ -833,6 +834,29 @@ Poll expectCheck(const Step& s, std::string& why)
     why = std::to_string(n) + " copies still built from the type only";
     return n == 0 ? Poll::Done : Poll::Wait;
   }
+  if (what == "minioncopies") // minioncopies <slot> <n>: copies of that player's minions shown here
+  {
+    unsigned n = minions::copiesShown(static_cast<uint8_t>(intArg(s, 2)));
+    why = std::to_string(n) + " copies";
+    return static_cast<int>(n) >= intArg(s, 3) ? Poll::Done : Poll::Wait;
+  }
+  if (what == "nominioncopies") // nominioncopies <slot>: no copy of that player's minions here
+  {
+    unsigned n = minions::copiesShown(static_cast<uint8_t>(intArg(s, 2)));
+    why = std::to_string(n) + " copies";
+    return n == 0 ? Poll::Done : Poll::Wait;
+  }
+  if (what == "minionhurt") // one of our minions has lost health (hits on its copies reach it)
+  {
+    float worst = 1.0f;
+    for (uint8_t i = 0; i < 32; i++)
+      if (engine::Unit* u = minions::localMinion(i))
+        worst = std::min(worst, engine::field<float>(u, engine::kUnitHealth) / std::max(1, engine::GetMaxHealth(u)));
+    char b[48];
+    std::snprintf(b, sizeof(b), "lowest minion health %.0f%%", worst * 100.0f);
+    why = b;
+    return worst < 0.999f ? Poll::Done : Poll::Wait;
+  }
   if (what == "minions") // minions <slot> <n>: that player's character here has n minions besides its pet
   {
     int slot = intArg(s, 2);
@@ -1289,6 +1313,33 @@ Poll run(const Step& s, bool begin, std::string& why)
     std::snprintf(b, sizeof(b), "skill %016llx at (%.1f, %.1f) -> %u", guid, at.x, at.z, r);
     why = b;
     return Poll::Done; // 0 may only mean "queued until in range": the game casts it when it gets there
+  }
+  if (cmd == "killminion")
+  {
+    // Test only: our first minion dies.
+    engine::Unit* u = minions::localMinion(0);
+    if (!u)
+    {
+      why = "no minion";
+      return Poll::Wait;
+    }
+    engine::kill(u);
+    return Poll::Done;
+  }
+  if (cmd == "hitminioncopy")
+  {
+    // Test only: a monster's hit on our copy of that player's minion, through TakeDamage as the
+    // game would deal it (the copy forwards it to the real minion).
+    engine::Unit* copy = minions::anyCopy(static_cast<uint8_t>(intArg(s, 1)));
+    engine::Unit* monster = nearestMonster(1e9f);
+    if (!copy || !monster)
+    {
+      why = !copy ? "no minion copy" : "no monster";
+      return Poll::Wait;
+    }
+    Vec3 src = unitPosition(monster), dir{0.0f, 0.0f, 0.0f};
+    engine::TakeDamage(copy, level, &src, floatArg(s, 2, 5.0f), &dir, 0.0f, monster, 1, 1, 0, 0, 0);
+    return Poll::Done;
   }
   if (cmd == "learnskill" && s.args.size() > 1)
   {

@@ -47,6 +47,9 @@ std::wstring fromUtf8(const std::string& s);
 // HUD notice (the small message line), held for `seconds`.
 void showNotice(const std::string& utf8, float seconds);
 
+// Shows a remote unit's health on its copy (health bar, what monsters see): max and current.
+void applyVitals(engine::Unit* unit, float health, uint32_t maxHealth);
+
 // True for the units we spawned to represent remote players (character or pet).
 bool isAvatarUnit(const void* unit);
 // True while we are building a remote player's stand-in (CreatePlayer up to its placement).
