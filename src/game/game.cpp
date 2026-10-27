@@ -527,10 +527,17 @@ static void applyVitals(engine::Unit* unit, float health, uint32_t maxHealth)
     return;
   auto base = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(unit) + engine::kUnitBaseHealth);
   auto bonus = reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(unit) + engine::kUnitBonusHealth);
-  if (*base != static_cast<int>(maxHealth) || *bonus != 0)
-  {
-    *base = static_cast<int>(maxHealth);
+  if (*bonus != 0)
     *bonus = 0;
+  // GetMaxHealth applies the unit's own modifiers (gear stats, effects: a percentage and a flat
+  // bonus) to the base, and those can change under a stand-in: correct the base until the maximum
+  // is the real one (the percentage can make one step overshoot).
+  for (int i = 0; i < 4; i++)
+  {
+    int off = static_cast<int>(maxHealth) - engine::GetMaxHealth(unit);
+    if (off == 0)
+      break;
+    *base += off;
   }
   float max = static_cast<float>(engine::GetMaxHealth(unit));
   float h = health < 1.0f ? 1.0f : health; // never 0 on a stand-in: that is the game's "dead"

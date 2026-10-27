@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace tlmp::game::spawns {
@@ -23,6 +24,41 @@ static void* g_collecting = nullptr;
 static void* g_insidePlayer = nullptr;
 static void* g_outsidePlayer = nullptr;
 static unsigned g_inside = 0, g_outside = 0;
+
+// Trigger areas seen on the current floor (for logs and the test rig).
+struct Area
+{
+  uint32_t level;
+  Vec3 pos;
+  unsigned fired;
+  bool waiting;
+};
+static std::unordered_map<void*, Area> g_areas;
+
+static Area& areaOf(void* trigger)
+{
+  uint32_t here = levelId(currentLevel());
+  for (auto it = g_areas.begin(); it != g_areas.end();)
+    it = it->second.level != here ? g_areas.erase(it) : std::next(it); // a new floor: forget the old one
+  auto it = g_areas.find(trigger);
+  if (it == g_areas.end())
+  {
+    Area a{here, {}, 0, false};
+    engine::GetPosition(trigger, &a.pos, 1);
+    it = g_areas.emplace(trigger, a).first;
+  }
+  return it->second;
+}
+
+static void fire(void* trigger, void* player, HandlerFn inside)
+{
+  Area& a = areaOf(trigger);
+  if (a.waiting || !a.fired)
+    TLMP_LOG("spawns: area %p at (%.1f, %.1f) fires%s", trigger, a.pos.x, a.pos.z, a.waiting ? " (everyone is here)" : "");
+  a.fired++;
+  a.waiting = false;
+  inside(trigger, player);
+}
 
 static bool inSession()
 {
@@ -134,6 +170,7 @@ void endTriggerUpdate(void* trigger, HandlerFn inside, HandlerFn outside)
   g_collecting = nullptr;
   if (!g_insidePlayer)
   {
+    areaOf(trigger).waiting = false;
     if (g_outsidePlayer)
       outside(trigger, g_outsidePlayer);
     return;
@@ -141,7 +178,7 @@ void endTriggerUpdate(void* trigger, HandlerFn inside, HandlerFn outside)
   uint32_t here = levelId(currentLevel());
   if (floor::isTownLevel(here))
   {
-    inside(trigger, g_insidePlayer); // town events are anyone's, as in single player
+    fire(trigger, g_insidePlayer, inside); // town events are anyone's, as in single player
     return;
   }
 
@@ -171,9 +208,13 @@ void endTriggerUpdate(void* trigger, HandlerFn inside, HandlerFn outside)
   }
   if (!missing)
   {
-    inside(trigger, g_insidePlayer);
+    fire(trigger, g_insidePlayer, inside);
     return;
   }
+  Area& area = areaOf(trigger);
+  if (!area.waiting)
+    TLMP_LOG("spawns: area %p at (%.1f, %.1f) waits for %s", trigger, area.pos.x, area.pos.z, waitingFor.c_str());
+  area.waiting = true;
 
   static float nextNotice = 0.0f;
   if (clock() < nextNotice)
@@ -210,6 +251,32 @@ void onMessage(uint8_t fromSlot, net::Msg type, net::Reader& r)
     showNotice("The party is waiting for you to catch up before something happens", kNoticeInterval + 0.5f);
 }
 
+bool nearestArea(const Vec3& from, float minDistance, Vec3* pos, void** id)
+{
+  uint32_t here = levelId(currentLevel());
+  float best = 1e9f;
+  for (const auto& [t, a] : g_areas)
+  {
+    float d = distXZ(a.pos, from);
+    if (a.level == here && !a.fired && d >= minDistance && d < best)
+    {
+      best = d;
+      *pos = a.pos;
+      *id = t;
+    }
+  }
+  return best < 1e9f;
+}
+
+int areaState(void* id, bool* waiting)
+{
+  auto it = g_areas.find(id);
+  if (it == g_areas.end())
+    return -1;
+  *waiting = it->second.waiting;
+  return static_cast<int>(it->second.fired);
+}
+
 // --- formation nodes ---------------------------------------------------------------------------
 
 template <typename Fn>
@@ -231,30 +298,48 @@ static Vec3 nodePosition(uint8_t* node)
   return out;
 }
 
-static unsigned g_nodeUpdates = 0;
+// 0x50E5A0 (engine.h): spawns the group once given a position within its range; the first argument
+// is a time step handed to its scene object, so the extra checks pass 0.
+using NodeUpdateFn = uint32_t(__thiscall*)(void* node, uint32_t dt, uint32_t unused, const Vec3* position);
+constexpr float kNodeCheckInterval = 0.25f;
 
-void afterNodeUpdate(void* node, uint32_t a, uint32_t b, NodeUpdateFn original)
+void tick()
 {
-  if (++g_nodeUpdates == 1 || g_nodeUpdates % 5000 == 0)
-    TLMP_LOG("spawns: formation node updates seen: %u", g_nodeUpdates);
-  // `node` is the node's level-update part (CFormationNode + 0xF0); its "spawned" flag follows.
-  auto* spawned = static_cast<uint8_t*>(node) + 4;
-  if (*spawned || !floor::ownsCurrentLevel() || !inSession())
+  static float next = 0.0f;
+  if (clock() < next || !g_session || !inSession() || !floor::ownsCurrentLevel())
     return;
-  uint32_t lid = levelId(currentLevel());
-  for (uint8_t s = 0; s < net::kMaxPlayers && !*spawned; s++)
+  next = clock() + kNodeCheckInterval;
+  engine::Level* level = currentLevel();
+  uint32_t lid = levelId(level);
+  if (floor::isTownLevel(lid))
+    return;
+  Vec3 others[net::kMaxPlayers];
+  uint8_t slots[net::kMaxPlayers];
+  unsigned n = 0;
+  for (uint8_t s = 0; s < net::kMaxPlayers; s++)
   {
-    if (!floor::slotInGame(s) || floor::slotLevel(s) != lid || floor::currentOwner() == s)
+    if (s == g_session->localSlot() || !floor::slotInGame(s) || floor::slotLevel(s) != lid)
       continue;
-    engine::Unit* standIn = avatarOf(s);
-    if (!standIn)
-      continue;
-    Vec3 p = unitPosition(standIn);
-    original(node, 0, b, &p); // no time passes on these extra checks
-    if (*spawned)
-      TLMP_LOG("spawns: a monster group woke up for slot %u", s);
+    if (engine::Unit* standIn = avatarOf(s))
+    {
+      slots[n] = s;
+      others[n++] = unitPosition(standIn);
+    }
   }
-  (void)a;
+  if (!n)
+    return;
+  auto update = reinterpret_cast<NodeUpdateFn>(engine::kNodeUpdate);
+  forEachNode(level, [&](uint8_t* node) {
+    for (unsigned i = 0; i < n && !node[engine::kNodeSpawned]; i++)
+    {
+      update(node + 0xF0, 0, 0, &others[i]);
+      if (node[engine::kNodeSpawned])
+      {
+        Vec3 at = nodePosition(node);
+        TLMP_LOG("spawns: the monster group at (%.1f, %.1f) woke up for slot %u", at.x, at.z, slots[i]);
+      }
+    }
+  });
 }
 
 void writeSnapshot(net::Writer& w)

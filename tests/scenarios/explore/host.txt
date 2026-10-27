@@ -1,5 +1,6 @@
-# On a fresh floor the client walks off to a monster group that hasn't appeared yet; the host's game
-# (which runs the floor) should spawn it for the client, and the client should see copies of it.
+# On a fresh floor the client goes to a monster group that hasn't appeared yet, far from the host; the
+# host's game (which runs the floor) should spawn it for the client, and the client should see copies.
+# Groups are placed per machine and only the floor owner's spawn, so the host shares where its group is.
 players 2 timeout=90
 click ContinueLast timeout=90
 ingame timeout=90
@@ -18,6 +19,7 @@ expect samelevel 1 timeout=60
 wait 5
 mark
 dump before
+share node 45
 sync start timeout=60
 sync clientthere timeout=240
 expect moremonsters timeout=20

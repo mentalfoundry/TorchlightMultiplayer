@@ -72,6 +72,9 @@ uint32_t g_levelMark = 0;
 unsigned g_monstersMark = 0;
 int g_groundMark = 0;
 unsigned g_rollsMark = 0;
+void* g_area = nullptr; // trigger area of the last `teleport area`
+bool g_hasShared = false; // a position another machine shared (`share node`), for `teleport shared`
+float g_sharedX = 0.0f, g_sharedZ = 0.0f;
 
 // Items lying on this floor within `radius` of the local player (the level's ground list, +0x68).
 int groundItemsNear(float radius)
@@ -810,6 +813,18 @@ Poll expectCheck(const Step& s, std::string& why)
     why = got.empty() ? "nothing replayed" : "last " + got;
     return _stricmp(got.c_str(), want.c_str()) == 0 ? Poll::Done : Poll::Wait;
   }
+  if (what == "area") // area waiting|fired|unfired: the trigger area of the last `teleport area`
+  {
+    std::string want = s.args.size() > 2 ? s.args[2] : std::string();
+    bool waiting = false;
+    int fired = spawns::areaState(g_area, &waiting);
+    why = fired < 0 ? "no area" : "fired " + std::to_string(fired) + (waiting ? ", waiting for the party" : "");
+    if (fired < 0)
+      return Poll::Wait;
+    if (want == "unfired") // must hold now, not eventually
+      return fired == 0 ? Poll::Done : Poll::Fail;
+    return (want == "fired" ? fired > 0 : waiting) ? Poll::Done : Poll::Wait;
+  }
   if (what == "lootrolls") // lootrolls N: our game rolled treasure for N kills since mark (drops are random)
   {
     unsigned n = hooks::killTreasureRolls() - g_rollsMark;
@@ -924,6 +939,28 @@ Poll run(const Step& s, bool begin, std::string& why)
         missing += " " + std::to_string(i);
     why = missing.empty() ? "" : "waiting for slots" + missing;
     return missing.empty() ? Poll::Done : Poll::Wait;
+  }
+  if (cmd == "share" && s.args.size() > 1 && s.args[1] == "node")
+  {
+    // Test only: tell the others where our nearest unspawned monster group (at least <min> away) is;
+    // groups are placed per machine, so only the floor owner's ones spawn.
+    float x = 0.0f, z = 0.0f;
+    if (!spawns::nearestWaitingGroup(floatArg(s, 2, 25.0f), &x, &z))
+    {
+      why = "no waiting monster group";
+      return Poll::Fail;
+    }
+    char b[64];
+    std::snprintf(b, sizeof(b), "at:%.2f,%.2f", x, z);
+    net::Writer w(Msg::TestSync);
+    w.u8(mySlot());
+    w.str(b);
+    if (g_session->isHost())
+      g_session->sendToAll(w, true);
+    else
+      g_session->sendTo(0, w, true);
+    why = b;
+    return Poll::Done;
   }
   if (cmd == "click")
   {
@@ -1089,6 +1126,34 @@ Poll run(const Step& s, bool begin, std::string& why)
     why = b;
     return Poll::Done;
   }
+  if (cmd == "teleport" && s.args.size() > 1 && s.args[1] == "shared")
+  {
+    if (!g_hasShared)
+    {
+      why = "nothing shared yet";
+      return Poll::Wait;
+    }
+    engine::setPosition(m, Vec3{g_sharedX, myPos.y, g_sharedZ});
+    char b[64];
+    std::snprintf(b, sizeof(b), "to (%.1f, %.1f)", g_sharedX, g_sharedZ);
+    why = b;
+    return Poll::Done;
+  }
+  if (cmd == "teleport" && s.args.size() > 1 && s.args[1] == "area")
+  {
+    // Test only: into the nearest trigger area that hasn't fired, at least <min> from here.
+    Vec3 at{};
+    if (!spawns::nearestArea(myPos, floatArg(s, 2, 0.0f), &at, &g_area))
+    {
+      why = "no trigger area seen";
+      return Poll::Wait;
+    }
+    engine::setPosition(m, Vec3{at.x, myPos.y, at.z});
+    char b[64];
+    std::snprintf(b, sizeof(b), "to (%.1f, %.1f)", at.x, at.z);
+    why = b;
+    return Poll::Done;
+  }
   if (cmd == "teleport")
   {
     // Test only: straight to the nearest monster group still waiting (no walkable path needed).
@@ -1170,6 +1235,12 @@ Poll run(const Step& s, bool begin, std::string& why)
   {
     why = "no such animation";
     return anim::playOneShot(m, s.args.size() > 1 ? s.args[1].c_str() : "") ? Poll::Done : Poll::Fail;
+  }
+  if (cmd == "hardcore" && s.args.size() > 1)
+  {
+    // Test only (test profiles): make this character hardcore in memory, so a death is final.
+    *reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(m) + engine::kPlayerHardcore) = s.args[1] == "on" ? 1 : 0;
+    return Poll::Done;
   }
   if (cmd == "die")
   {
@@ -1355,6 +1426,8 @@ void onMessage(uint8_t fromSlot, Msg type, net::Reader& r)
   std::string name = r.str();
   if (!r.ok() || slot >= net::kMaxPlayers)
     return;
+  if (name.compare(0, 3, "at:") == 0 && std::sscanf(name.c_str() + 3, "%f,%f", &g_sharedX, &g_sharedZ) == 2)
+    g_hasShared = true; // `share node` from another machine
   g_syncSeen[slot].insert(name);
   if (g_session && g_session->isHost())
   {

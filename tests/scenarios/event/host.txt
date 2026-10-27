@@ -1,0 +1,23 @@
+# Party-wide trigger events: the host steps into a trigger area far from the client. It must not
+# fire, but wait, telling the host whom it waits for and the client that the party waits for it;
+# once the client catches up, it fires.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+wait 5
+mark
+teleport area 25 timeout=30
+wait 3
+expect area unfired
+expect area waiting timeout=20
+expect notice Waiting for timeout=20
+dump waiting
+shot waiting
+sync waiting timeout=60
+sync joined timeout=60
+expect area fired timeout=30
+dump fired
+shot fired
+sync end timeout=60
+quit

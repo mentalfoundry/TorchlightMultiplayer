@@ -44,6 +44,7 @@ public:
     game::combat::tick();
     game::loot::tick();
     game::quests::tick();
+    game::spawns::tick();
     game::autotest::tick();
     game::triggers::tick();
     game::party::tick();

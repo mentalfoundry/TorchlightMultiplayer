@@ -1,0 +1,16 @@
+# Party-wide trigger events (see host.txt): stay put until told the party waits, then join the host.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+mark
+expect notice party is waiting timeout=60
+sync waiting timeout=60
+teleport player 0 timeout=30
+wait 2
+sync joined timeout=60
+wait 3
+dump fired
+sync end timeout=60
+quit

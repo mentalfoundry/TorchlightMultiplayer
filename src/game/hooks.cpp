@@ -191,17 +191,6 @@ static void __fastcall triggerOutsideHook(void* self, void* edx, void* player)
     g_triggerOutside(self, edx, player);
 }
 
-// Formation node update: also for the other players on a floor this machine runs.
-using NodeUpdateHookFn = uint32_t(__fastcall*)(void* self, void* edx, uint32_t a, uint32_t b, const void* pos);
-static NodeUpdateHookFn g_nodeUpdate = nullptr;
-
-static uint32_t __fastcall nodeUpdateHook(void* self, void* edx, uint32_t a, uint32_t b, const void* pos)
-{
-  uint32_t result = g_nodeUpdate(self, edx, a, b, pos);
-  game::spawns::afterNodeUpdate(self, a, b, reinterpret_cast<game::spawns::NodeUpdateFn>(g_nodeUpdate));
-  return result;
-}
-
 // Unit activity (who thinks and moves): near any player on a floor this machine runs (spawns.h).
 using ActivityHookFn = void(__fastcall*)(void* self, void* edx, const void* pos);
 static ActivityHookFn g_activity = nullptr;
@@ -619,8 +608,6 @@ bool install()
             reinterpret_cast<void**>(&g_triggerInside), "CLogicTrigger::Inside") ||
       !hook(engine::kTriggerVolumeOutside, reinterpret_cast<void*>(&triggerOutsideHook),
             reinterpret_cast<void**>(&g_triggerOutside), "CLogicTrigger::Outside") ||
-      !hook(engine::kNodeUpdate, reinterpret_cast<void*>(&nodeUpdateHook), reinterpret_cast<void**>(&g_nodeUpdate),
-            "CFormationNode::Update") ||
       !hook(engine::kUnitActivity, reinterpret_cast<void*>(&activityHook), reinterpret_cast<void**>(&g_activity),
             "CCharacter::UpdateActivity"))
     return false;

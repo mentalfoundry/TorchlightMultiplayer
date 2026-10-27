@@ -1,5 +1,5 @@
-# On a fresh floor the client walks off to a monster group that hasn't appeared yet; the host's game
-# (which runs the floor) should spawn it for the client, and the client should see copies of it.
+# On a fresh floor the client goes to the host's unspawned monster group (see host.txt); the host's
+# game should spawn it for the client, and the client should see copies of it.
 players 2 timeout=90
 click ContinueLast timeout=90
 ingame timeout=90
@@ -20,7 +20,7 @@ wait 5
 mark
 sync start timeout=60
 dump before
-teleport node 25
+teleport shared timeout=30
 wait 4
 sync clientthere timeout=30
 expect moremonsters timeout=20

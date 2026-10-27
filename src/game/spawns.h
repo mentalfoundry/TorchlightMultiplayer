@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/engine.h"
 #include "net/protocol.h"
 
 #include <cstdint>
@@ -18,8 +19,8 @@ class Session;
 // that the party is waiting.
 //
 // Formation nodes (the monster groups placed in a floor) wake up for the position the level update
-// passes (the local player's). On the machine running the floor they are also offered every other
-// player's position. Groups are placed differently on each machine (they don't match by position
+// passes (the local player's), and the game updates them only now and then. On the machine running
+// the floor, tick() offers every group not spawned yet each other player's position. Groups are placed differently on each machine (they don't match by position
 // across games), so each machine keeps its own; the snapshot only carries the owner's list.
 namespace tlmp::game::spawns {
 
@@ -34,14 +35,18 @@ bool onTriggerOutside(void* trigger, void* player);
 using HandlerFn = void(__thiscall*)(void* trigger, void* player);
 void endTriggerUpdate(void* trigger, HandlerFn inside, HandlerFn outside);
 
-// Formation node update hook: after the game's own call, for the other players on the floor.
-using NodeUpdateFn = uint32_t(__thiscall*)(void* node, uint32_t a, uint32_t b, const void* position);
-void afterNodeUpdate(void* node, uint32_t a, uint32_t b, NodeUpdateFn original);
+// Formation nodes: the game only offers them the local player's position, and only now and then; on
+// the machine running the floor, every group not spawned yet is offered each other player's position.
+void tick();
 
 // Test mode: the closest monster group on this floor that hasn't spawned yet (at least minDistance away).
 bool nearestWaitingGroup(float minDistance, float* x, float* z);
 void countGroups(unsigned* total, unsigned* waiting);
 void listWaiting(void (*fn)(float x, float z, void* ctx), void* ctx);
+// Test mode: the closest trigger area seen on this floor that hasn't fired (at least minDistance from
+// `from`), and an area's state: times fired (-1 = unknown area), whether it is waiting for the party.
+bool nearestArea(const engine::Vec3& from, float minDistance, engine::Vec3* pos, void** id);
+int areaState(void* id, bool* waiting);
 
 // Unit activity check hook (0x48BDF0): on the machine running the floor, a unit far from its own
 // player is checked again against every other player there (else monsters near them freeze).

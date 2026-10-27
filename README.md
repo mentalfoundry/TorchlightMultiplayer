@@ -50,9 +50,10 @@ writes dumps and screenshots to `<game>\tlmp_test\<profile>\`.
 python tools\compare.py <run> <tag>   # owner's monsters vs the copies, stand-ins vs the real players
 ```
 
-Scenarios live in `tests\scenarios\<name>\host.txt` / `client.txt`. Tests use the profiles `t1` (host) and `t2`
-(client) under `<game>\tlmp_profiles`, whose saves are reset from `tlmp_profiles\_test_seed` before every run;
-the real profiles are never touched. Two game windows open and close while tests run.
+Scenarios live in `tests\scenarios\<name>\host.txt` / `client.txt` (or `client1.txt` .. `client3.txt` for more
+players). Tests use the profiles `t1` (host) and `t2`..`t4` (clients) under `<game>\tlmp_profiles`, whose saves
+are reset from `tlmp_profiles\_test_seed` before every run; the real profiles are never touched. Game windows
+open and close while tests run; avoid typing during a run (the game reads some keys from any window).
 
 ## How co-op plays
 
@@ -87,8 +88,8 @@ the real profiles are never touched. Two game windows open and close while tests
 | Combat, shared XP/fame, health bars, animations, per-player death screens | done, rig-tested |
 | Loot: per-player kill loot, shared player drops | done, rig-tested |
 | Quests: per-save quests, shared targets and kill credit | done, rig-tested |
-| Party-wide trigger events with waiting messages | built, not yet tested |
-| Monster groups waking near remote players, quest targets for late arrivals, hardcore deaths, 3-4 players | built, not yet tested |
+| Party-wide trigger events with waiting messages | done, rig-tested |
+| Monster groups waking near remote players, quest targets for late arrivals, hardcore deaths, 4 players | done, rig-tested |
 | Skills/spells effects and summoned minions on other machines | not started |
 | Party difficulty scaling | not started |
 | Stand-in stats (remote players are level-1 characters wearing the real gear) | not started |

@@ -1,0 +1,32 @@
+# Dead players and party travel. Softcore: the client dies and the host's trip waits until it
+# resurrects, then they go together. Hardcore (made so for the test): the client dies again and the
+# host's trip no longer waits for it, while it stays connected.
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+sync start timeout=60
+sync died timeout=60
+expect avatardead 1 timeout=20
+wait 3
+mark
+stairs down
+expect notice to resurrect timeout=20
+wait 4
+expect samelevel 1 timeout=5
+sync waited timeout=60
+expect newlevel timeout=90
+expect samelevel 1 timeout=60
+wait 5
+sync again timeout=60
+sync died2 timeout=60
+expect avatardead 1 timeout=20
+wait 3
+mark
+stairs down
+expect newlevel timeout=30
+wait 3
+dump travelled
+sync travelled timeout=60
+sync end timeout=60
+quit

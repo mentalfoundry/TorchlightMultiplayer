@@ -1,0 +1,16 @@
+# A quest target for a late arrival (see host.txt): continue only after the host's kill, take the
+# quest at once (before joining the party's floor), then find and kill the new target there.
+players 2 timeout=90
+sync hostkilled timeout=240
+click ContinueLast timeout=90
+ingame timeout=90
+console QUESTACTIVE BardRandom
+expect samelevel 0 timeout=90
+wait 5
+killquest timeout=60
+wait 3
+expect questdone BardRandom timeout=15
+dump after
+sync clientdone timeout=60
+sync end timeout=60
+quit

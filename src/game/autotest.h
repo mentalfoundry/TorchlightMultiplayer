@@ -28,6 +28,10 @@ class Session;
 //   expect hurt (health below the last mark)   expect noshared   expect newlevel (since mark)
 //   expect avatardead <slot>      expect anim <slot> <name>   expect moremonsters (than at mark)   expect groundloot (new items near me since mark)
 //   expect lootrolls <n> (our game rolled treasure for n kills since mark; what drops is random)
+//   teleport area [min distance]  (into the nearest trigger area not fired yet)   expect area waiting|fired|unfired
+//   expect quest <name> [state]   expect questdone <name>   killquest [approach]   key shift down|up
+//   share node [min]  (send our nearest unspawned monster group's position)   teleport shared
+//   hardcore on|off  (this character, in memory)
 //   walkto node [min distance]  (the nearest monster group not spawned yet)   teleport node [min]   teleport monster <min distance from the host>   teleport player <slot>
 //   expect dead|alive          expect town|dungeon       expect samelevel <slot>
 //   dump <tag>                 shot <tag>                console <command line> (cheats allowed)

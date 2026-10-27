@@ -1,0 +1,25 @@
+# A quest target for a late arrival: the host takes BardRandom, goes down to its floor alone (the
+# client waits on the title screen, so it doesn't hold up travel) and kills the target. The client
+# then joins with the same quest: the host must create a new target for it (the first one is dead).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+wait 3
+console QUESTACTIVE BardRandom
+wait 2
+mark
+stairs down
+expect newlevel timeout=60
+wait 5
+mark
+stairs down
+expect newlevel timeout=60
+wait 5
+killquest timeout=60
+wait 3
+expect questdone BardRandom timeout=15
+sync hostkilled timeout=240
+sync clientdone timeout=240
+dump after
+sync end timeout=60
+quit

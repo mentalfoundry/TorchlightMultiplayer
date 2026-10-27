@@ -1,0 +1,21 @@
+# Four players (see host.txt): client 3.
+players 4 timeout=120
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=180
+expect avatar 0 timeout=60
+expect avatar 1 timeout=60
+expect avatar 2 timeout=60
+wait 3
+dump start
+walkto player 0 timeout=60
+sync gathered timeout=120
+mark
+expect newlevel timeout=90
+expect samelevel 0 timeout=60
+wait 6
+sync arrived timeout=90
+dump arrived
+sync end timeout=90
+quit

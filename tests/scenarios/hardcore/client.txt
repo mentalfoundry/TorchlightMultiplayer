@@ -1,0 +1,29 @@
+# Dead players and party travel (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+walkto player 0 timeout=40
+sync start timeout=60
+die
+expect dead timeout=10
+sync died timeout=30
+sync waited timeout=60
+mark
+click Resurrect1 timeout=60
+expect alive timeout=60
+expect newlevel timeout=90
+expect samelevel 0 timeout=60
+wait 5
+walkto player 0 timeout=40
+hardcore on
+wait 2
+sync again timeout=60
+die
+expect dead timeout=10
+sync died2 timeout=30
+sync travelled timeout=90
+shot dead
+sync end timeout=60
+quit

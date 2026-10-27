@@ -1,0 +1,25 @@
+# Four players: everyone joins and sees the other three, the party travels down together, and the
+# floor's monsters are the same everywhere.
+players 4 timeout=120
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=180
+expect avatar 1 timeout=60
+expect avatar 2 timeout=60
+expect avatar 3 timeout=60
+wait 3
+dump start
+shot start
+sync gathered timeout=120
+mark
+stairs down
+expect newlevel timeout=90
+expect samelevel 1 timeout=60
+expect samelevel 2 timeout=60
+expect samelevel 3 timeout=60
+wait 6
+sync arrived timeout=90
+dump arrived
+shot arrived
+sync end timeout=90
+quit

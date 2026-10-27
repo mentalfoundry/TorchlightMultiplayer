@@ -19,12 +19,19 @@ $suite = [ordered]@{
   questkill   = @('after')
   questclient = @()
   shiftstart  = @()
+  event       = @()  # dumps are taken mid-fight (the ambush), so not compared
+  explore     = @('explored')
+  questlate   = @()
+  hardcore    = @()
+  party4      = @('start', 'arrived')
 }
 $summary = @()
 foreach ($name in $suite.Keys) {
   if ($Only -and $Only -notcontains $name) { continue }
   "==== $name"
-  $out = & (Join-Path $PSScriptRoot 'test.ps1') $name -Timeout 500
+  # client.txt / client1.txt .. clientN.txt: as many clients as scripts
+  $clients = [Math]::Max(1, @(Get-ChildItem (Join-Path $root "tests\scenarios\$name") -Filter 'client*.txt').Count)
+  $out = & (Join-Path $PSScriptRoot 'test.ps1') $name -Clients $clients -Timeout 500
   $out | ForEach-Object { "  $_" }
   $run = ($out | Where-Object { $_ -like 'run: *' } | Select-Object -First 1) -replace '^run: ', ''
   $fails = @($out | Where-Object { $_ -like 'FAIL*' -or $_ -like 'TIMED OUT*' })
