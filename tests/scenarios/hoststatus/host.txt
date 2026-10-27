@@ -1,0 +1,7 @@
+# Diagnostics: the host's status line on the title screen (with a placeholder public address).
+wait 4
+clickslow TLMP_HostButton timeout=60
+publicip 203.0.113.5
+wait 2
+shot status
+quit

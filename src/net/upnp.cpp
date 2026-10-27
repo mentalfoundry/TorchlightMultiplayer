@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <natupnp.h>
 #include <oleauto.h>
+#include <winhttp.h>
 
 #include <mutex>
 #include <thread>
@@ -13,6 +14,7 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "oleaut32.lib")
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winhttp.lib")
 
 namespace tlmp::net::upnp {
 
@@ -170,6 +172,84 @@ void close()
     nat->Release();
   CoUninitialize();
   set(State::Idle, "closed");
+}
+
+std::string localAddressText()
+{
+  static std::string cached;
+  if (cached.empty())
+  {
+    std::wstring w = localAddress();
+    cached = narrow(w.c_str());
+  }
+  return cached;
+}
+
+static std::mutex g_publicLock;
+static std::string g_public;
+static bool g_lookupStarted = false;
+
+std::string publicAddress()
+{
+  {
+    Status s = status();
+    if (s.state == State::Open && !s.externalIp.empty())
+      return s.externalIp; // what the router says
+  }
+  std::lock_guard<std::mutex> l(g_publicLock);
+  return g_public;
+}
+
+// One HTTPS GET to api.ipify.org, which answers with the caller's public IP as plain text.
+static void lookup()
+{
+  std::string ip;
+  HINTERNET session = WinHttpOpen(L"TLMP", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
+                                  WINHTTP_NO_PROXY_BYPASS, 0);
+  HINTERNET connect = session ? WinHttpConnect(session, L"api.ipify.org", INTERNET_DEFAULT_HTTPS_PORT, 0) : nullptr;
+  HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", L"/", nullptr, WINHTTP_NO_REFERER,
+                                                   WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE)
+                              : nullptr;
+  if (request)
+    WinHttpSetTimeouts(request, 5000, 5000, 5000, 5000);
+  if (request && WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+      WinHttpReceiveResponse(request, nullptr))
+  {
+    char buf[64] = {};
+    DWORD got = 0;
+    if (WinHttpReadData(request, buf, sizeof(buf) - 1, &got))
+    {
+      buf[got] = 0;
+      for (char* c = buf; *c; ++c)
+        if ((*c >= '0' && *c <= '9') || *c == '.' || *c == ':' || (*c >= 'a' && *c <= 'f') || (*c >= 'A' && *c <= 'F'))
+          ip += *c;
+        else
+          break;
+    }
+  }
+  if (request)
+    WinHttpCloseHandle(request);
+  if (connect)
+    WinHttpCloseHandle(connect);
+  if (session)
+    WinHttpCloseHandle(session);
+  TLMP_LOG("upnp: public address %s", ip.empty() ? "unknown (lookup failed)" : ip.c_str());
+  std::lock_guard<std::mutex> l(g_publicLock);
+  g_public = ip;
+}
+
+void setPublicAddressForTest(const std::string& address)
+{
+  std::lock_guard<std::mutex> l(g_publicLock);
+  g_public = address;
+}
+
+void lookupPublicAddress()
+{
+  if (g_lookupStarted)
+    return; // once per run
+  g_lookupStarted = true;
+  std::thread(lookup).detach();
 }
 
 bool probe(std::string* detail)

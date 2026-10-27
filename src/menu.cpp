@@ -99,10 +99,18 @@ static void* windowNamed(const char* name)
   return wm && g_c.present(wm, n.p()) ? g_c.getWindow(wm, n.p()) : nullptr;
 }
 
+// CEGUI throws for a property the window type doesn't have: that must not end the game.
 static void prop(void* w, const char* name, const std::string& value)
 {
   Str n(name), v(value);
-  g_c.setProperty(w, n.p(), v.p());
+  try
+  {
+    g_c.setProperty(w, n.p(), v.p());
+  }
+  catch (...)
+  {
+    TLMP_LOG("menu: CEGUI refused property %s = %s", name, value.c_str());
+  }
 }
 
 static void text(void* w, const std::string& value)
@@ -130,6 +138,7 @@ static void* make(void* parent, const char* type, const char* name, const char* 
 constexpr const char* kHost = "TLMP_HostButton";
 constexpr const char* kJoin = "TLMP_JoinButton";
 constexpr const char* kStatus = "TLMP_Status";
+constexpr const char* kJoinAt = "TLMP_JoinAt";
 constexpr const char* kAddress = "TLMP_Address";
 constexpr const char* kAddressBack = "TLMP_AddressBack";
 constexpr const char* kConnect = "TLMP_Connect";
@@ -142,19 +151,28 @@ static void build(void* parent)
   // On the Continue button's row, in the two free spots to its left.
   make(parent, "GuiLook/StandardButton", kHost, "{{.5,-507},{1,-140}}", "{{0,246},{0,44}}", "Host Co-op");
   make(parent, "GuiLook/StandardButton", kJoin, "{{.5,-251},{1,-140}}", "{{0,246},{0,44}}", "Join Co-op");
-  if (void* s = make(parent, "GuiLook/StaticText", kStatus, "{{.5,-507},{1,-178}}", "{{0,750},{0,32}}", ""))
+  // Hosting: the address friends join at, big enough to read out.
+  if (void* s = make(parent, "GuiLook/StaticText", kJoinAt, "{{.5,-497},{1,-238}}", "{{0,740},{0,40}}", ""))
+  {
+    prop(s, "Font", "SerifBig");
+    prop(s, "TextColour", "FFFFC84A");
+    prop(s, "MousePassThroughEnabled", "True");
+  }
+  if (void* s = make(parent, "GuiLook/StaticText", kStatus, "{{.5,-497},{1,-196}}", "{{0,740},{0,52}}", ""))
   {
     prop(s, "Font", "SerifSmall");
     prop(s, "TextColour", "FFFFFFFF");
     prop(s, "MousePassThroughEnabled", "True");
+    prop(s, "HorzTextFormatting", "WordWrapLeftAligned");
   }
   // A framed field, as the character screen has its name box: a text panel under the edit box.
-  if (void* back = make(parent, "GuiLook/ItemText", kAddressBack, "{{.5,-507},{1,-140}}", "{{0,246},{0,44}}", ""))
+  // A little in from the left: the frame's border is drawn outside the window's rectangle.
+  if (void* back = make(parent, "GuiLook/ItemText", kAddressBack, "{{.5,-494},{1,-140}}", "{{0,236},{0,44}}", ""))
   {
     prop(back, "MousePassThroughEnabled", "True");
     g_c.setVisible(back, false);
   }
-  if (void* e = make(parent, "GuiLook/Editbox", kAddress, "{{.5,-497},{1,-134}}", "{{0,226},{0,32}}", ""))
+  if (void* e = make(parent, "GuiLook/Editbox", kAddress, "{{.5,-484},{1,-134}}", "{{0,216},{0,32}}", ""))
   {
     prop(e, "MaxTextLength", "64");
     g_c.setVisible(e, false);
@@ -246,6 +264,17 @@ void tick()
     static std::string last;
     std::string now = g_joining ? "Co-op: type the host's address (IP, or IP:port), then Connect"
                                 : g_actions.status ? g_actions.status() : "";
+    if (now != last)
+    {
+      last = now;
+      text(s, now);
+    }
+  }
+  if (void* s = windowNamed(kJoinAt))
+  {
+    static std::string last;
+    std::string address = g_actions.joinAddress ? g_actions.joinAddress() : "";
+    std::string now = address.empty() || g_joining ? "" : "Friends join at " + address;
     if (now != last)
     {
       last = now;

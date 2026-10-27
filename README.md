@@ -22,8 +22,10 @@ On the title screen, **Host Co-op** starts a session; friends click **Join Co-op
 address (`IP` or `IP:port`) and **Connect**, then everyone clicks Continue. In a session the button
 reads **Leave Co-op**. The line above the buttons says what the session is doing.
 
-Playing over the internet: when you host, the game asks your router to open UDP port 27960 (UPnP)
-and tells you the address friends should use. If your router doesn't do UPnP, it tells you so:
+Playing over the internet: when you host, the title screen shows the address friends join at
+(your public IP and port, from the router or, failing that, one lookup at api.ipify.org) and the
+address for friends on your own network. The game also asks your router to open UDP port 27960
+(UPnP). If your router doesn't do UPnP, it tells you so:
 forward UDP 27960 to your PC in the router's settings, and give friends your public IP. (A VPN such
 as Tailscale or ZeroTier also works: join with the host's VPN address.) If the host leaves, everyone
 else is told and keeps playing on their own; they can join again later.

@@ -16,6 +16,7 @@ struct Actions
   std::string (*status)();                 // one line: what the session is doing
   bool (*inSession)();                     // hosting, connected or connecting
   std::string (*lastAddress)();            // to fill the address box with
+  std::string (*joinAddress)();            // host: "IP:port" friends join at ("" while unknown / not hosting)
 };
 
 void init(const Actions& actions);

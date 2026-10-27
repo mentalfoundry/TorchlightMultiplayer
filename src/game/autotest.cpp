@@ -1639,6 +1639,19 @@ Poll run(const Step& s, bool begin, std::string& why)
     changeLevel(L"Town", -99);
     return Poll::Done;
   }
+  if (cmd == "publicip" && s.args.size() > 1)
+  {
+    net::upnp::setPublicAddressForTest(s.args[1]); // a placeholder for the status line
+    return Poll::Done;
+  }
+  if (cmd == "lookuppublicip")
+  {
+    // The real lookup (one HTTPS request to api.ipify.org); passes once it has an answer.
+    net::upnp::lookupPublicAddress();
+    std::string ip = net::upnp::publicAddress();
+    why = ip.empty() ? "no answer yet" : "found (" + std::to_string(ip.size()) + " characters)";
+    return ip.empty() ? Poll::Wait : Poll::Done;
+  }
   if (cmd == "upnpprobe")
   {
     // Read-only: does a UPnP router answer? (No port is mapped.)
@@ -1805,7 +1818,8 @@ void tick()
   if (p == Poll::Wait)
     return;
   bool check = s.args[0] == "expect" || s.args[0] == "pickup" || s.args[0] == "killnear" || s.args[0] == "teleport" ||
-               s.args[0] == "skill" || s.args[0] == "learnskill" || s.args[0] == "skilllevel" || s.args[0] == "upnpprobe";
+               s.args[0] == "skill" || s.args[0] == "learnskill" || s.args[0] == "skilllevel" || s.args[0] == "upnpprobe" ||
+               s.args[0] == "lookuppublicip";
   if (p == Poll::Fail)
   {
     g_failed++;

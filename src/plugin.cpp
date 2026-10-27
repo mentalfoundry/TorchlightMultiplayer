@@ -204,9 +204,11 @@ static bool beginSession(NetMode mode, const std::string& address)
   }
   g_config.mode = mode;
   TLMP_LOG("session: %s as '%s'", mode == NetMode::Host ? "hosting" : ("joining " + address).c_str(), c.playerName.c_str());
-  // Test runs never touch the router (they host on every run).
+  // Test runs never touch the router (they host on every run) or ask for the public address.
   if (mode == NetMode::Host && c.upnp && c.testScript.empty())
     net::upnp::open(c.port);
+  if (mode == NetMode::Host && c.testScript.empty())
+    net::upnp::lookupPublicAddress();
   return true;
 }
 
@@ -232,14 +234,22 @@ static std::string sessionStatus()
     return "Co-op: not in a session";
   if (g_session.isHost())
   {
+    // The address friends join at has its own big line (menu joinAddress); this one has the rest.
+    std::string port = std::to_string(g_config.port);
+    std::string lan = net::upnp::localAddressText();
+    std::string pub = net::upnp::publicAddress();
     net::upnp::Status u = net::upnp::status();
-    std::string reach = u.state == net::upnp::State::Open && !u.externalIp.empty()
-                          ? "friends join at " + u.externalIp + ":" + std::to_string(g_config.port)
-                        : u.state == net::upnp::State::Working ? "opening the port on your router..."
-                        : u.state == net::upnp::State::Open    ? "port " + std::to_string(g_config.port) + " is open"
-                        : "forward UDP " + std::to_string(g_config.port) + " on your router for friends to join";
-    std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s); %s", g_session.playerCount(), reach.c_str());
-    return b;
+    std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s).", g_session.playerCount());
+    std::string line = b;
+    if (pub.empty())
+      line += " Finding your internet address...";
+    if (!lan.empty())
+      line += " Friends on your network: " + lan + ":" + port + ".";
+    if (u.state == net::upnp::State::Working)
+      line += " Opening the port on your router...";
+    else if (u.state != net::upnp::State::Open && !pub.empty())
+      line += " If friends can't connect, forward UDP " + port + " to this PC on your router.";
+    return line;
   }
   if (!g_session.isConnected())
     return "Co-op: connecting to " + g_config.address + "...";
@@ -329,6 +339,10 @@ static void start()
     [] { return sessionStatus(); },
     [] { return g_session.isActive(); },
     [] { return g_config.address; },
+    [] {
+      std::string pub = g_session.isHost() ? net::upnp::publicAddress() : "";
+      return pub.empty() ? pub : pub + ":" + std::to_string(g_config.port);
+    },
   });
 }
 

@@ -35,4 +35,12 @@ Status status();
 // Read-only check whether a UPnP router answers (no mapping made). Blocking.
 bool probe(std::string* detail);
 
+// The addresses friends use to join: this PC's on the local network (known at once), and the
+// public one -- from the router when UPnP mapped the port, else asked of a public "what's my IP"
+// service once (lookupPublicAddress, async). Empty while unknown.
+std::string localAddressText();
+void lookupPublicAddress();
+std::string publicAddress();
+void setPublicAddressForTest(const std::string& address); // test mode: a placeholder (no lookup)
+
 } // namespace tlmp::net::upnp
