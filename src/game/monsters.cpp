@@ -519,6 +519,7 @@ static uint32_t g_rosterLevel = 0;
 static bool g_haveRoster = false;
 static std::unordered_map<uint32_t, Mirror> g_mirrors;
 static std::unordered_set<engine::Unit*> g_puppets;
+static bool g_destroyingOurs = false; // our own destroyUnit calls (not news for the logs)
 static unsigned g_refused = 0;
 
 static void clientReset(engine::Level* level)
@@ -573,7 +574,9 @@ static void removePuppet(Mirror& m)
   if (m.puppet.level)
   {
     engine::RemoveUnit(m.puppet.level, m.puppet.unit, false);
+    g_destroyingOurs = true;
     engine::destroyUnit(m.puppet.unit);
+    g_destroyingOurs = false;
   }
   m.puppet = {};
 }
@@ -1253,6 +1256,40 @@ unsigned copiesWithoutLook()
     if (m.puppet.unit && !m.fromLook)
       n++;
   return n;
+}
+
+void onUnitDestroyed(void* unit)
+{
+  auto* u = static_cast<engine::Unit*>(unit);
+  if (g_puppets.erase(u))
+  {
+    for (auto& [id, m] : g_mirrors)
+      if (m.puppet.unit == u)
+      {
+        if (!g_destroyingOurs)
+          TLMP_LOG("monsters: the game freed copy %u (%p, %s)", id, unit, m.dead ? "dead" : "alive");
+        m.puppet = {}; // a dead one stays dead (not respawned); a living one comes back next tick
+      }
+  }
+  auto it = g_trackedIds.find(u);
+  if (it != g_trackedIds.end())
+  {
+    uint32_t id = it->second;
+    auto t = g_tracked.find(id);
+    if (t != g_tracked.end() && !t->second.deathSent && g_session && g_session->isConnected())
+    {
+      // Freed without dying here first: for everyone else it's gone too.
+      net::Writer w(Msg::MonsterDied);
+      w.u32(levelId(currentLevel()));
+      w.u32(id);
+      floor::sendToFloor(w, true);
+    }
+    if (!g_destroyingOurs)
+      TLMP_LOG("monsters: the game freed monster %u (%p)", id, unit);
+    if (t != g_tracked.end())
+      g_tracked.erase(t);
+    g_trackedIds.erase(it);
+  }
 }
 
 void allowLocalSpawns(bool allow)

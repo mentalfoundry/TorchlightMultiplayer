@@ -5,6 +5,8 @@
 #include "game/internal.h"
 #include "game/autotest.h"
 #include "game/floor.h"
+#include "game/minions.h"
+#include "game/monsters.h"
 #include "game/party.h"
 #include "log.h"
 
@@ -892,6 +894,46 @@ bool isAvatarUnit(const void* unit)
   return false;
 }
 
+const char* describeUnit(void* unit)
+{
+  static char buf[96];
+  for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
+  {
+    const Avatar& a = g_avatars[slot];
+    if (a.player.unit == unit || a.pet.unit == unit)
+    {
+      std::snprintf(buf, sizeof(buf), " -- slot %u's %s (placed on level %p)", slot, a.player.unit == unit ? "stand-in" : "pet copy",
+                    a.player.unit == unit ? static_cast<void*>(a.player.level) : static_cast<void*>(a.pet.level));
+      return buf;
+    }
+  }
+  if (monsters::isPuppetUnit(unit))
+    return " -- a monster copy";
+  uint8_t s = 0, i = 0;
+  if (minions::copyOf(unit, &s, &i))
+  {
+    std::snprintf(buf, sizeof(buf), " -- slot %u's minion copy", s);
+    return buf;
+  }
+  return "";
+}
+
+void onUnitDestroyed(void* unit)
+{
+  for (uint8_t slot = 0; slot < net::kMaxPlayers; slot++)
+  {
+    Avatar& a = g_avatars[slot];
+    if (a.player.unit == unit)
+    {
+      unregisterClientEntry(a);
+      a.player = {};
+      a.skillsOn = nullptr;
+    }
+    if (a.pet.unit == unit)
+      a.pet = {};
+  }
+}
+
 void onLevelDestroyed(void* level)
 {
   g_layoutSeeds.erase(level);
@@ -1108,15 +1150,21 @@ void showNotice(const std::string& utf8, float seconds)
     engine::ShowSmallMessage(ui, vs::make(fromUtf8(utf8).c_str()), seconds);
 }
 
-void showChat(const std::string& who, const std::string& text)
+void showChat(const std::string& who, const std::string& text, chat::Kind kind)
 {
   TLMP_LOG("chat: <%s> %s", who.c_str(), text.c_str());
-  void* ui = gameUI();
-  if (!ui)
+  chat::add(who, text, kind);
+  if (!gameUI())
     return;
-  std::wstring line = fromUtf8(who) + L": " + fromUtf8(text);
-  engine::ShowSmallMessage(ui, vs::make(line.c_str()), 8.0f);
-  consolePrint(line);
+  consolePrint(fromUtf8(who) + L": " + fromUtf8(text));
+}
+
+void say(const std::string& text)
+{
+  if (text.empty() || !g_chatSend)
+    return;
+  g_chatSend(text);
+  showChat(g_localName, text, chat::Kind::Own); // local echo
 }
 
 // Console commands that only affect the local view/logs. Everything else in the developer
@@ -1157,11 +1205,7 @@ bool onConsoleLine(const wchar_t* line)
   else
     return false;
 
-  if (msg.empty() || !g_chatSend)
-    return true;
-  std::string text = toUtf8(msg.c_str());
-  g_chatSend(text);
-  showChat(g_localName, text); // local echo
+  say(toUtf8(msg.c_str()));
   return true;
 }
 
@@ -1224,7 +1268,7 @@ static void putBackConsoleSettings(uintptr_t settings)
 void showMessage(const std::string& text, float seconds)
 {
   showNotice(text, seconds);
-  showChat("TLMP", text);
+  showChat("TLMP", text, chat::Kind::System);
 }
 
 bool playing()

@@ -1,0 +1,21 @@
+# Dead monsters' corpses (see host.txt).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+console GOD
+teleport monster 0 timeout=20
+killnear timeout=30
+killnear timeout=30
+killnear timeout=30
+sync killed timeout=60
+wait 25
+walkto player 0 timeout=40
+sync waited timeout=60
+mark
+expect newlevel timeout=60
+expect samelevel 0 timeout=60
+wait 5
+sync end timeout=60
+quit

@@ -154,6 +154,14 @@ constexpr uintptr_t kTestRoomShiftCheck = 0x00419158;
 constexpr uintptr_t kSaveCharacter = 0x00417380;
 
 // --- UI / console / settings --------------------------------------------------------------
+// CKeyManager at CGameClient+0x240: the game's key state, polled by its hotkeys. The window
+// procedure (0x40DE20) gives each key message to CEGUI (GameUI 0x53FE70: injectKeyDown/Up/Char)
+// and then to 0x4E7120 OnMessage(msg, vk), which sets down +0x909[vk] and the pressed / released
+// edges +0x709 / +0xB09; 0x4E7220 moves the edges to +0x9 / +0x409 each frame. Queries: pressed
+// 0x4E71B0, down (or pressed) 0x4E71D0, released 0x4E7200.
+constexpr uint32_t kClientKeys = 0x240;
+constexpr uintptr_t kKeyManagerOnMessage = 0x004E7120;
+constexpr uint32_t kKeysDown = 0x909;
 // 0x53FC90: CGameUI::ShowSmallMessage(std::wstring text [by value], float seconds). Shown in
 // the HUD's SmallMessageText window (+0x90), held for `seconds`, then faded.
 using ShowSmallMessageFn = void(__thiscall*)(void* gameUI, vs::WString text, float seconds);

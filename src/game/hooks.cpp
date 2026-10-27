@@ -1,9 +1,11 @@
 #include "game/hooks.h"
+#include "chat.h"
 #include "game/anim.h"
 #include "game/combat.h"
 #include "game/floor.h"
 #include "game/loot.h"
 #include "game/quests.h"
+#include "game/levelguard.h"
 #include "game/minions.h"
 #include "game/skills.h"
 #include "game/spawns.h"
@@ -200,6 +202,8 @@ static ActivityHookFn g_activity = nullptr;
 
 static void __fastcall activityHook(void* self, void* edx, const void* pos)
 {
+  if (!game::levelguard::unitResourcesOk(self, game::currentLevel()))
+    return; // would crash in HasTag on the other level's freed tables (levelguard.h)
   g_activity(self, edx, pos);
   game::spawns::afterActivityCheck(self, reinterpret_cast<game::spawns::ActivityFn>(g_activity));
 }
@@ -451,6 +455,45 @@ static uint32_t __fastcall useSkillHook(void* self, void* edx, uint32_t lo, uint
                                 hi);
 }
 
+// CCharacter::~CCharacter (0x4A9340, every monster and player): whoever frees a unit -- the game
+// (corpses, level teardown) or us -- no module may keep a pointer to it.
+using CharDtorFn = void(__fastcall*)(void* self, void* edx);
+static CharDtorFn g_charDtor = nullptr;
+
+static void __fastcall charDtorHook(void* self, void* edx)
+{
+  void* callers[4] = {};
+  USHORT n = CaptureStackBackTrace(1, 4, callers, nullptr);
+  game::levelguard::noteDestroyed(self, callers, n, game::currentLevel());
+  game::monsters::onUnitDestroyed(self);
+  game::minions::onUnitDestroyed(self);
+  game::onUnitDestroyed(self);
+  g_charDtor(self, edx);
+}
+
+// CKeyManager::OnMessage (0x4E7120, thiscall(keys, msg, vk), ret 8): the game's key state, fed from
+// the window procedure after CEGUI. The chat box keeps keys from it while one types (chat.h).
+using KeyMessageFn = void(__fastcall*)(void* keys, void* edx, uint32_t msg, uint32_t vk);
+static KeyMessageFn g_keyMessage = nullptr;
+
+static void __fastcall keyMessageHook(void* keys, void* edx, uint32_t msg, uint32_t vk)
+{
+  if (chat::onKey(msg, vk))
+    return;
+  g_keyMessage(keys, edx, msg, vk);
+}
+
+// CLevel's once-a-second activity pass (0x4F7340, thiscall(level, pos), ret 4): its lists are
+// checked for freed entries first (levelguard.h).
+using ActivityPassFn = void(__fastcall*)(void* level, void* edx, void* pos);
+static ActivityPassFn g_activityPass = nullptr;
+
+static void __fastcall activityPassHook(void* level, void* edx, void* pos)
+{
+  game::levelguard::checkLists(level);
+  g_activityPass(level, edx, pos);
+}
+
 // Treasure rolls (CLevel 0x4F7790 / 0x4F7A40, engine.h): counts Kill's rolls for the rig; what a roll
 // drops is random.
 static void* g_dropTreasureTable = nullptr;
@@ -660,6 +703,13 @@ bool install()
     return false;
   if (!hook(0x00415A50, reinterpret_cast<void*>(&loadCharacterStub), &g_loadCharacter, "LoadCharacter (log)") ||
       !hook(0x00500BC0, reinterpret_cast<void*>(&levelFromFileStub), &g_levelFromFile, "CLevel::BuildFromFile (log)"))
+    return false;
+  if (!hook(0x004A9340, reinterpret_cast<void*>(&charDtorHook), reinterpret_cast<void**>(&g_charDtor),
+            "CCharacter::~CCharacter") ||
+      !hook(0x004F7340, reinterpret_cast<void*>(&activityPassHook), reinterpret_cast<void**>(&g_activityPass),
+            "CLevel::UpdateActivity") ||
+      !hook(engine::kKeyManagerOnMessage, reinterpret_cast<void*>(&keyMessageHook),
+            reinterpret_cast<void**>(&g_keyMessage), "CKeyManager::OnMessage"))
     return false;
   if (!hook(engine::kUseSkill, reinterpret_cast<void*>(&useSkillHook), reinterpret_cast<void**>(&g_useSkill),
             "CCharacter::UseSkill"))

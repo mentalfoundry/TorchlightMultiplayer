@@ -1,0 +1,19 @@
+# The chat box (see host.txt).
+players 2 timeout=90
+wait 4
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+expect chat hello from the host timeout=60
+sync said timeout=60
+keys {enter}
+expect typing timeout=5
+keys hi back, and a longer message to see how the chat box wraps a line wider than its column of rows
+keys {enter}
+expect nottyping timeout=5
+expect chat hi back timeout=5
+wait 1
+shot chat
+sync end timeout=60
+quit

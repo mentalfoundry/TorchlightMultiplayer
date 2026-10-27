@@ -33,6 +33,8 @@ $suite = [ordered]@{
   passives    = @('skills')
   hostleaves  = @()
   menu        = @()
+  corpses     = @()
+  chat        = @()
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

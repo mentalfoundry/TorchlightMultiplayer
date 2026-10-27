@@ -56,6 +56,8 @@ void becomeMirror();
 // We ran a floor someone else runs too (both loaded it at once): our own monsters go, copies of
 // theirs come with their roster.
 void discardOwn();
+// CCharacter destructor hook: a unit is being freed (by the game or by us); drop every pointer to it.
+void onUnitDestroyed(void* unit);
 // Monster health added per player in the game beyond the first (the host's setting; 0.5 = +50%).
 void setHealthPerPlayer(float perPlayer);
 // Test mode: the range of party multipliers on the monsters this machine runs (false: none).

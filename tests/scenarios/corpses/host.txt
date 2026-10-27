@@ -1,0 +1,18 @@
+# Dead monsters' corpses: the game frees them about 10 s after death, on every machine. The client
+# kills a few copies, everyone waits until the corpses are gone, then the party travels (the client
+# drops its copies of the old floor -- freed corpses included, which once meant freeing them twice).
+players 2 timeout=90
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+console GOD
+sync killed timeout=120
+wait 25
+sync waited timeout=60
+mark
+stairs down
+expect newlevel timeout=60
+expect samelevel 1 timeout=60
+wait 5
+sync end timeout=60
+quit

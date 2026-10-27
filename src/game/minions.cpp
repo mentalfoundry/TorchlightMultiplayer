@@ -339,6 +339,21 @@ void tick()
   }
 }
 
+void onUnitDestroyed(void* unit)
+{
+  for (Remote& rem : g_remote)
+  {
+    for (Copy& c : rem.copies)
+      if (c.puppet.unit == unit)
+        c = {};
+    for (auto it = rem.strays.begin(); it != rem.strays.end();)
+      it = it->first == unit ? rem.strays.erase(it) : std::next(it);
+  }
+  for (auto& u : g_reported)
+    if (u == unit)
+      u = nullptr;
+}
+
 void onLevelDestroyed(void* level)
 {
   for (Remote& rem : g_remote)

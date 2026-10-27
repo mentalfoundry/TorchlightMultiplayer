@@ -1,5 +1,7 @@
 #pragma once
 
+#include "chat.h"
+
 #include "net/protocol.h"
 
 #include <cstdint>
@@ -30,10 +32,12 @@ bool readLocalPlayerState(net::PlayerState& out);
 // Class and pet of the local character; empty strings if there is none.
 net::PlayerInfo localPlayerInfo();
 
-// Chat. The console (opened with the game's console key) doubles as chat input: lines
-// starting with "/" or "say " are sent to the other players instead of being executed.
+// Chat. Typed in the chat box (chat.h); the console (opened with the game's console key) doubles
+// as chat input: lines starting with "/" or "say " are sent to the other players instead of being
+// executed. Messages show in the chat box and the console.
 void setChatSender(void (*send)(const std::string& text));
-void showChat(const std::string& who, const std::string& text);
+void showChat(const std::string& who, const std::string& text, chat::Kind kind = chat::Kind::Player);
+void say(const std::string& text); // to the others, and shown here
 // Name to show for a remote player: their character's name once known, else `fallback`
 // (the network name they joined with).
 std::string displayName(uint8_t slot, const std::string& fallback);
@@ -62,6 +66,10 @@ void onRemoteInfo(uint8_t slot, const net::PlayerInfo& info);
 
 // Called from the CLevel destructor hook, before the level frees its units.
 void onLevelDestroyed(void* level);
+// CCharacter destructor hook: forget a stand-in or pet copy that is being freed.
+void onUnitDestroyed(void* unit);
+// For logs: " -- slot 1's stand-in" and the like for units of ours, "" for the game's own.
+const char* describeUnit(void* unit);
 
 // Called from the RNG hook at the level layout seed call (0x4FF6DC). Returns the seed to
 // actually use: with a host world seed active, the character's own world-seed term is

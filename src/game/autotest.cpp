@@ -1,4 +1,6 @@
 #include "game/autotest.h"
+#include "cegui.h"
+#include "chat.h"
 #include "game/anim.h"
 #include "game/diag.h"
 #include "game/engine.h"
@@ -979,6 +981,30 @@ Poll expectCheck(const Step& s, std::string& why)
     why = std::to_string(n) + " copies still built from the type only";
     return n == 0 ? Poll::Done : Poll::Wait;
   }
+  if (what == "chat" && s.args.size() > 2) // chat <text>: the chat box shows a row with that in it
+  {
+    std::string want = restFrom(s, 2), got = chat::shownText();
+    why = "'" + got + "'";
+    for (char& c : why)
+      if (c == '\n')
+        c = '|';
+    return got.find(want) != std::string::npos ? Poll::Done : Poll::Wait;
+  }
+  if (what == "typing" || what == "nottyping") // the chat box's input line is open / closed
+  {
+    why = chat::typing() ? "typing" : "not typing";
+    return chat::typing() == (what == "typing") ? Poll::Done : Poll::Wait;
+  }
+  if ((what == "keydown" || what == "keyup") && s.args.size() > 2) // keydown <hex vk>: the game sees it held
+  {
+    uint32_t vk = std::strtoul(s.args[2].c_str(), nullptr, 16) & 0xFF;
+    uintptr_t client = gameClient();
+    uint8_t down = 0;
+    if (client)
+      down = *reinterpret_cast<const uint8_t*>(client + engine::kClientKeys + engine::kKeysDown + vk);
+    why = down ? "held" : "not held";
+    return (down != 0) == (what == "keydown") ? Poll::Done : Poll::Wait;
+  }
   if (what == "windowtext" && s.args.size() > 2) // windowtext <window> <text>: e.g. an edit box's contents
   {
     std::string want = restFrom(s, 3), got = windowText(s.args[2]);
@@ -1416,6 +1442,82 @@ Poll run(const Step& s, bool begin, std::string& why)
     char b[64];
     std::snprintf(b, sizeof(b), "to (%.1f, %.1f)", x, z);
     why = b;
+    return Poll::Done;
+  }
+  if ((cmd == "focus" || cmd == "unfocus") && s.args.size() > 1)
+  {
+    // Test only: shows a window (and its parents) and gives it the keyboard, as the game does when
+    // it opens e.g. the console -- or hides that one window again.
+    if (!cegui::resolve())
+      return Poll::Wait;
+    void* w = nullptr;
+    if (s.args[1] == "console" || s.args[1] == "consoleframe")
+    {
+      // The developer console's frame (CConsole +0xC; its layout's names get a random prefix) and
+      // its input line.
+      uintptr_t client = gameClient();
+      uint32_t ui = 0, console = 0, frame = 0;
+      if (client && diag::readU32(client + engine::kClientGameUI, ui) && ui &&
+          diag::readU32(ui + engine::kGameUIConsole, console) && console && diag::readU32(console + 0xC, frame))
+        w = s.args[1] == "console" ? cegui::findByType(reinterpret_cast<void*>(frame), "Editbox")
+                                   : reinterpret_cast<void*>(frame);
+    }
+    else
+      w = cegui::windowNamed(s.args[1].c_str());
+    if (!w)
+      return Poll::Wait;
+    if (cmd == "unfocus")
+    {
+      cegui::api.setVisible(w, false);
+      return Poll::Done;
+    }
+    for (void* p = w; p && p != cegui::sheet(); p = cegui::api.parent(p))
+      cegui::api.setVisible(p, true);
+    if (cegui::api.activate)
+      cegui::api.activate(w);
+    return Poll::Done;
+  }
+  if (cmd == "keys" && s.args.size() > 1)
+  {
+    // Typing, as window messages to the game window (its window procedure feeds CEGUI and the key
+    // manager, engine.h): characters as WM_CHAR; {enter} / {esc} a press of that key; {down:XX} /
+    // {up:XX} a virtual key (hex) going down / up.
+    if (!g_window)
+      EnumWindows(findWindow, 0);
+    if (!g_window)
+      return Poll::Wait;
+    std::wstring keys = fromUtf8(restFrom(s, 1));
+    auto key = [](UINT msg, UINT vk) {
+      LPARAM l = 1 | (static_cast<LPARAM>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)) << 16);
+      if (msg == WM_KEYUP)
+        l |= 0xC0000000;
+      PostMessageW(g_window, msg, vk, l);
+    };
+    for (size_t i = 0; i < keys.size(); i++)
+    {
+      if (keys[i] == L'{')
+      {
+        size_t end = keys.find(L'}', i);
+        std::wstring tok = end == std::wstring::npos ? L"" : keys.substr(i + 1, end - i - 1);
+        if (tok == L"enter" || tok == L"esc")
+        {
+          UINT vk = tok == L"enter" ? VK_RETURN : VK_ESCAPE;
+          key(WM_KEYDOWN, vk);
+          PostMessageW(g_window, WM_CHAR, tok == L"enter" ? 0x0D : 0x1B, 1);
+          key(WM_KEYUP, vk);
+          i = end;
+          continue;
+        }
+        if (tok.size() > 3 && (tok.compare(0, 5, L"down:") == 0 || tok.compare(0, 3, L"up:") == 0))
+        {
+          bool down = tok[0] == L'd';
+          key(down ? WM_KEYDOWN : WM_KEYUP, wcstoul(tok.c_str() + (down ? 5 : 3), nullptr, 16));
+          i = end;
+          continue;
+        }
+      }
+      PostMessageW(g_window, WM_CHAR, keys[i], 1);
+    }
     return Poll::Done;
   }
   if (cmd == "key" && s.args.size() > 2 && s.args[1] == "shift")

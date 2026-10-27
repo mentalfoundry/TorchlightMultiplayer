@@ -253,11 +253,22 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   (found by sampling the game thread during saves). Stand-ins are therefore only taken off the level
   for a save (RemoveUnit / AddUnit), never destroyed and rebuilt.
 
-## Open: rare crash in the unit activity check (2026-10-28)
-- Once in many runs (handover, host returning from town to a floor the client ran): access violation at
-  0x526C6E (HasTag 0x480760 <- 0x48BDF0 activity check <- 0x4F7340 <- CLevel::Update 0x4F8B20) on a
-  freed unit still in a level list, 0.7 s after the client's stand-in and pet copy were spawned.
-  Not reproduced in three reruns. Suspects: a unit we free (release / removePuppet / equip's removed
-  items) that is still in an update list RemoveUnit doesn't clear (+0x60?).
+## Crash in the unit activity check: minions of a freed master (2026-10-28, fixed)
+- About one handover run in three (host returning from town to a floor the client ran): access
+  violation in HasTag 0x480760 -> 0x5FE190 / 0x526D30 reading a float-looking address (0x3ECCCCDD,
+  0x3F800010, 0xBF328F41), from the activity check 0x48BDF0 (<- per-unit update 0x4AE910, or the
+  level's activity pass 0x4F7340).
+- Cause: a minion's master pointer (+0x5B4, set by SetMaster 0x499E70). The activity check reads the
+  master's +0x161 and calls HasTag(master, 0x1C) at 0x48C0A3. The game clears the pointer only when
+  the master dies (the minion's own update, 0x4AF235: master state +0x284 is 5 or 6) and in a console
+  command (0x4A0C80); never when the master is freed. At a handover the host takes its own monsters off
+  the floor for the snapshot's: group leaders (a master with 3-6 minions) were freed while their
+  minions stayed, and the next check read the freed master.
+- Fix (levelguard.cpp): the CCharacter destructor hook clears +0x5B4 on every live unit of the dying
+  unit's level (and the current one) that names it as master, as SetMaster(0) would. The game also
+  does this itself at load: a temporary player is freed while the pet still points at it (re-set
+  right after). 10/10 handover runs clean afterwards (it had crashed on 1 in 3).
+- The update loop is CLevel+0x5C (0x4F8440, per frame); +0x64 all units and +0x68 items are what
+  the once-a-second activity pass 0x4F7340 walks.
 - Symbolize TLMP.dll frames with DbgHelp (SymFromAddr against build\RelWithDebInfo\TLMP.pdb, base
   0x6D310000 as the crash log shows it).

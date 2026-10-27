@@ -21,6 +21,8 @@
 #include "net/session.h"
 #include "net/upnp.h"
 #include "menu.h"
+#include "chat.h"
+#include "game/levelguard.h"
 #include "ogre_abi.h"
 #include "profile.h"
 
@@ -47,6 +49,7 @@ public:
     game::tick(evt.timeSinceLastFrame);
     upnpReport();
     menu::tick();
+    chat::tick();
     game::floor::tick();
     game::monsters::tick();
     game::combat::tick();
@@ -324,6 +327,11 @@ static void start()
     game::showChat(game::displayName(slot, g_session.player(slot).name), text);
   };
   game::setChatSender([](const std::string& text) { g_session.sendChat(text); });
+  chat::init(chat::Actions{
+    [](const std::string& text) { game::say(text); },
+    [] { return g_session.isActive() && game::playing(); },
+  });
+  game::levelguard::setDescriber(&game::describeUnit);
   // TLMP.ini / command line may start a session right away; otherwise the title screen's co-op
   // buttons do (menu.cpp).
   if (g_config.mode != NetMode::Off)

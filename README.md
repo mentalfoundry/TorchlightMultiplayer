@@ -39,11 +39,13 @@ Torchlight.exe -tlmp-profile <name> ...                   # separate settings/sa
 Torchlight.exe -tlmp-worldseed <n>                        # testing: generate floors as if a host's world seed were n
 ```
 
-Chat: open the console with **Shift + `** (the ~ key) and type `/message` or `say message`.
-During a session the console is switched on in memory only (your settings files keep their own values), and
+Chat: press **Enter**, type, and press **Enter** to send (**Esc** closes the line without sending).
+Messages show on the left of the screen and fade after a while; pressing Enter shows them again. While the
+chat line is open the game's hotkeys don't react to typing. The console (**Shift + `**, the ~ key) works too:
+`/message` or `say message`. During a session the console is switched on in memory only (your settings files keep their own values), and
 its cheat commands are refused; only HELP, CLS, FPS, ROOM, SHOWUI, HIDEUI and ACHIEVEMENTS work.
-Chat and names are UTF-8. The HUD fonts can show Latin-1 (e.g. é, ü, ñ); the console font also shows Greek and
-Cyrillic. No shipped font has Chinese/Japanese/Korean glyphs.
+Chat and names are UTF-8. The chat box and HUD fonts can show Latin-1 (e.g. é, ü, ñ); the console font also
+shows Greek and Cyrillic. No shipped font has Chinese/Japanese/Korean glyphs.
 
 Logs: `TLMP_<pid>.log` in the game folder (crashes are logged there too).
 
@@ -118,6 +120,7 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Town portals for other players (shown where cast; anyone can use one to go to town) | done, rig-tested |
 | Waypoints (to another floor: a party trip; to town: alone) | done, rig-tested |
 | Title-screen Host/Join menu, host leaving ends the session cleanly | done, rig-tested |
+| In-game chat box (Enter to type; hotkeys held off while typing) | done, rig-tested |
 | Internet play: UPnP port opening, manual forwarding fallback | built; not tested on a UPnP router or over the internet |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).

@@ -22,6 +22,7 @@ void attach(net::Session* session);
 void tick();
 void onMessage(uint8_t fromSlot, net::Msg type, net::Reader& r);
 void onLevelDestroyed(void* level);
+void onUnitDestroyed(void* unit); // CCharacter destructor hook
 
 // A copy of a remote player's minion: whose (slot) and which (index in their report).
 bool copyOf(const void* unit, uint8_t* slot, uint8_t* index);

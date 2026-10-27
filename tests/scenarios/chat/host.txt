@@ -1,0 +1,52 @@
+# The chat box: Enter opens it, Enter sends what was typed (shown on both screens), Esc closes it;
+# while it is open the game sees no key presses.
+players 2 timeout=90
+wait 4
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+wait 3
+keys {enter}
+expect typing timeout=5
+keys hello from the host
+wait 1
+shot typing
+keys {enter}
+expect nottyping timeout=5
+expect chat hello from the host timeout=5
+sync said timeout=60
+expect chat hi back timeout=30
+wait 1
+shot chat
+# Typing: a key going down doesn't reach the game.
+keys {enter}
+expect typing timeout=5
+keys {down:49}
+wait 1
+expect keyup 49
+keys {up:49}
+keys {esc}
+expect nottyping timeout=5
+# Closed: it does.
+keys {down:49}
+expect keydown 49 timeout=5
+keys {up:49}
+expect keyup 49 timeout=5
+# An empty line sends nothing.
+keys {enter}
+expect typing timeout=5
+keys {enter}
+expect nottyping timeout=5
+# Enter in the developer console runs its line: it doesn't open the chat box.
+focus console timeout=10
+keys {enter}
+wait 1
+expect nottyping
+unfocus consoleframe
+wait 1
+keys {enter}
+expect typing timeout=5
+keys {esc}
+expect nottyping timeout=5
+sync end timeout=60
+quit
