@@ -18,8 +18,8 @@ Install does three things:
 
 ## Running
 
-On the title screen, **Host Co-op** starts a session; friends click **Join Co-op**, type the host's
-address (`IP` or `IP:port`) and **Connect**, then everyone clicks Continue. In a session the button
+On the title screen, **Host Co-op** starts a session; friends click **Join Co-op**, type or paste
+(Ctrl+V or the Paste button) the host's address (`IP` or `IP:port`) and **Connect**, then everyone clicks Continue. In a session the button
 reads **Leave Co-op**. The line above the buttons says what the session is doing.
 
 Playing over the internet: when you host, the title screen shows the address friends join at

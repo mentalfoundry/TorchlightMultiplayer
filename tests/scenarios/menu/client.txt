@@ -1,8 +1,14 @@
-# The title screen's co-op buttons (see host.txt): Join Co-op, type the address, Connect.
+# The title screen's co-op buttons (see host.txt): Join Co-op, paste the address, Connect.
 wait 8
 clickslow TLMP_JoinButton timeout=60
 wait 1
-settext TLMP_Address 127.0.0.1 timeout=10
+# Paste the address (the box has no clipboard of its own; the mod adds Ctrl+V and a Paste button).
+settext TLMP_Address x timeout=10
+clipboard save
+clipboard set 127.0.0.1
+clickslow TLMP_Paste timeout=10
+expect windowtext TLMP_Address 127.0.0.1 timeout=5
+clipboard restore
 shot joinbox
 clickslow TLMP_Connect timeout=10
 players 2 timeout=120

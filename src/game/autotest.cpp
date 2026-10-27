@@ -363,6 +363,27 @@ bool setWindowText(const std::string& name, const std::string& value)
   return true;
 }
 
+// A window's text ("" if it isn't there).
+std::string windowText(const std::string& name)
+{
+  const Cegui& c = cegui();
+  HMODULE m = GetModuleHandleW(L"CEGUIBase.dll");
+  static auto getText = reinterpret_cast<const void*(__thiscall*)(const void*)>(
+    GetProcAddress(m, "?getText@Window@CEGUI@@QBEABVString@2@XZ"));
+  static auto cStr = reinterpret_cast<const char*(__thiscall*)(const void*)>(GetProcAddress(m, "?c_str@String@CEGUI@@QBEPBDXZ"));
+  void* system = c.ok ? c.system() : nullptr;
+  void* sheet = system ? c.sheet(system) : nullptr;
+  if (!sheet || !getText || !cStr)
+    return "";
+  alignas(8) unsigned char str[256] = {};
+  c.strCtor(str, reinterpret_cast<const unsigned char*>(name.c_str()));
+  void* window = c.search(sheet, str);
+  c.strDtor(str);
+  const void* s = window ? getText(window) : nullptr;
+  const char* t = s ? cStr(s) : nullptr;
+  return t ? t : "";
+}
+
 // --- game state helpers ---------------------------------------------------------------------------
 
 engine::Unit* me()
@@ -957,6 +978,12 @@ Poll expectCheck(const Step& s, std::string& why)
     unsigned n = monsters::copiesWithoutLook();
     why = std::to_string(n) + " copies still built from the type only";
     return n == 0 ? Poll::Done : Poll::Wait;
+  }
+  if (what == "windowtext" && s.args.size() > 2) // windowtext <window> <text>: e.g. an edit box's contents
+  {
+    std::string want = restFrom(s, 3), got = windowText(s.args[2]);
+    why = "'" + got + "'";
+    return got == want ? Poll::Done : Poll::Wait;
   }
   if (what == "clipboard") // clipboard <text>: the clipboard holds exactly that text
   {
@@ -1655,7 +1682,7 @@ Poll run(const Step& s, bool begin, std::string& why)
     changeLevel(L"Town", -99);
     return Poll::Done;
   }
-  if (cmd == "clipboard" && s.args.size() > 1)
+  if (cmd == "clipboard" && s.args.size() > 1 && (s.args[1] == "save" || s.args[1] == "restore"))
   {
     // Test only: clipboard save | restore (the player's own clipboard text survives a test run).
     static std::wstring saved;
@@ -1682,6 +1709,23 @@ Poll run(const Step& s, bool begin, std::string& why)
         if (!SetClipboardData(CF_UNICODETEXT, mem))
           GlobalFree(mem);
       }
+    }
+    CloseClipboard();
+    return Poll::Done;
+  }
+  if (cmd == "clipboard" && s.args.size() > 2 && s.args[1] == "set")
+  {
+    // Test only: put text on the clipboard (after `clipboard save`).
+    std::wstring w = fromUtf8(restFrom(s, 2));
+    if (!OpenClipboard(nullptr))
+      return Poll::Wait;
+    EmptyClipboard();
+    if (HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, (w.size() + 1) * sizeof(wchar_t)))
+    {
+      std::memcpy(GlobalLock(mem), w.c_str(), (w.size() + 1) * sizeof(wchar_t));
+      GlobalUnlock(mem);
+      if (!SetClipboardData(CF_UNICODETEXT, mem))
+        GlobalFree(mem);
     }
     CloseClipboard();
     return Poll::Done;

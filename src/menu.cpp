@@ -144,6 +144,7 @@ constexpr const char* kAddress = "TLMP_Address";
 constexpr const char* kAddressBack = "TLMP_AddressBack";
 constexpr const char* kConnect = "TLMP_Connect";
 constexpr const char* kCancel = "TLMP_Cancel";
+constexpr const char* kPaste = "TLMP_Paste";
 
 static bool g_joining = false; // the address box is open
 
@@ -185,6 +186,8 @@ static void build(void* parent)
     g_c.setVisible(b, false);
   if (void* b = make(parent, "GuiLook/StandardButton", kCancel, "{{.5,-126},{1,-140}}", "{{0,120},{0,44}}", "Cancel"))
     g_c.setVisible(b, false);
+  if (void* b = make(parent, "GuiLook/StandardButton", kPaste, "{{.5,-1},{1,-140}}", "{{0,120},{0,44}}", "Paste"))
+    g_c.setVisible(b, false);
   TLMP_LOG("menu: co-op buttons added to the title screen");
 }
 
@@ -210,6 +213,49 @@ static bool copyToClipboard(const std::string& text)
   }
   CloseClipboard();
   return ok;
+}
+
+// The clipboard's text, cleaned up for an address box: surrounding spaces and line breaks go, and
+// anything that can't be part of "host[:port]" ends it.
+static std::string clipboardAddress()
+{
+  std::string out;
+  if (!OpenClipboard(nullptr))
+    return out;
+  HANDLE h = GetClipboardData(CF_UNICODETEXT);
+  if (auto* w = h ? static_cast<const wchar_t*>(GlobalLock(h)) : nullptr)
+  {
+    const wchar_t* c = w;
+    while (*c == L' ' || *c == L'\t' || *c == L'\r' || *c == L'\n')
+      ++c;
+    for (; *c && out.size() < 64; ++c)
+    {
+      bool ok = (*c >= L'0' && *c <= L'9') || (*c >= L'a' && *c <= L'z') || (*c >= L'A' && *c <= L'Z') || *c == L'.' ||
+                *c == L':' || *c == L'-' || *c == L'[' || *c == L']';
+      if (!ok)
+        break;
+      out += static_cast<char>(*c);
+    }
+    GlobalUnlock(h);
+  }
+  CloseClipboard();
+  return out;
+}
+
+// Ctrl+V / Shift+Insert, pressed while this game is the window in front.
+static bool pasteKeysPressed()
+{
+  static bool wasDown = false;
+  DWORD pid = 0;
+  HWND front = GetForegroundWindow();
+  if (front)
+    GetWindowThreadProcessId(front, &pid);
+  bool down = pid == GetCurrentProcessId() &&
+              (((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState('V') & 0x8000)) ||
+               ((GetAsyncKeyState(VK_SHIFT) & 0x8000) && (GetAsyncKeyState(VK_INSERT) & 0x8000)));
+  bool pressed = down && !wasDown;
+  wasDown = down;
+  return pressed;
 }
 
 // A click: the button was pushed and is now released. (Not checking that the mouse is still on
@@ -258,6 +304,8 @@ static void showJoinBox(bool show)
     g_c.setVisible(w, show);
   if (void* w = windowNamed(kCancel))
     g_c.setVisible(w, show);
+  if (void* w = windowNamed(kPaste))
+    g_c.setVisible(w, show);
 }
 
 void tick()
@@ -290,7 +338,7 @@ void tick()
   if (void* s = windowNamed(kStatus))
   {
     static std::string last;
-    std::string now = g_joining ? "Co-op: type the host's address (IP, or IP:port), then Connect"
+    std::string now = g_joining ? "Co-op: type or paste (Ctrl+V) the host's address (IP, or IP:port), then Connect"
                                 : g_actions.status ? g_actions.status() : "";
     if (now != last)
     {
@@ -352,12 +400,25 @@ void tick()
     showJoinBox(true);
   if (clicked(windowNamed(kCancel), cancelDown))
     showJoinBox(false);
+  // Pasting (the game's edit box has no clipboard of its own): the address replaces what's there.
+  static bool pasteDown = false;
+  bool pasteClicked = clicked(windowNamed(kPaste), pasteDown);
+  if (g_joining && (pasteClicked || pasteKeysPressed()))
+  {
+    std::string pasted = clipboardAddress();
+    if (void* box = windowNamed(kAddress); box && !pasted.empty())
+    {
+      text(box, pasted);
+      prop(box, "CaratIndex", std::to_string(pasted.size()));
+      TLMP_LOG("menu: pasted an address into the join box");
+    }
+  }
   if (clicked(windowNamed(kConnect), connectDown))
   {
-    std::string address = textOf(windowNamed(kAddress));
+    std::string typed = textOf(windowNamed(kAddress));
     showJoinBox(false);
-    if (!address.empty())
-      g_actions.join(address);
+    if (!typed.empty())
+      g_actions.join(typed);
   }
 }
 
