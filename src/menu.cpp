@@ -139,6 +139,7 @@ constexpr const char* kHost = "TLMP_HostButton";
 constexpr const char* kJoin = "TLMP_JoinButton";
 constexpr const char* kStatus = "TLMP_Status";
 constexpr const char* kJoinAt = "TLMP_JoinAt";
+constexpr const char* kCopy = "TLMP_CopyAddress";
 constexpr const char* kAddress = "TLMP_Address";
 constexpr const char* kAddressBack = "TLMP_AddressBack";
 constexpr const char* kConnect = "TLMP_Connect";
@@ -158,6 +159,9 @@ static void build(void* parent)
     prop(s, "TextColour", "FFFFC84A");
     prop(s, "MousePassThroughEnabled", "True");
   }
+  // Next to it: copies the address for pasting to friends.
+  if (void* b = make(parent, "GuiLook/StandardButton", kCopy, "{{.5,-150},{1,-242}}", "{{0,120},{0,40}}", "Copy"))
+    g_c.setVisible(b, false);
   if (void* s = make(parent, "GuiLook/StaticText", kStatus, "{{.5,-497},{1,-196}}", "{{0,740},{0,52}}", ""))
   {
     prop(s, "Font", "SerifSmall");
@@ -182,6 +186,30 @@ static void build(void* parent)
   if (void* b = make(parent, "GuiLook/StandardButton", kCancel, "{{.5,-126},{1,-140}}", "{{0,120},{0,44}}", "Cancel"))
     g_c.setVisible(b, false);
   TLMP_LOG("menu: co-op buttons added to the title screen");
+}
+
+// Puts text on the Windows clipboard.
+static bool copyToClipboard(const std::string& text)
+{
+  if (!OpenClipboard(nullptr))
+    return false;
+  EmptyClipboard();
+  int n = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+  HGLOBAL mem = n > 0 ? GlobalAlloc(GMEM_MOVEABLE, n * sizeof(wchar_t)) : nullptr;
+  bool ok = false;
+  if (mem)
+  {
+    if (auto* w = static_cast<wchar_t*>(GlobalLock(mem)))
+    {
+      MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, w, n);
+      GlobalUnlock(mem);
+      ok = SetClipboardData(CF_UNICODETEXT, mem) != nullptr;
+    }
+    if (!ok)
+      GlobalFree(mem);
+  }
+  CloseClipboard();
+  return ok;
 }
 
 // A click: the button was pushed and is now released. (Not checking that the mouse is still on
@@ -270,15 +298,34 @@ void tick()
       text(s, now);
     }
   }
+  std::string address = g_actions.joinAddress ? g_actions.joinAddress() : "";
   if (void* s = windowNamed(kJoinAt))
   {
     static std::string last;
-    std::string address = g_actions.joinAddress ? g_actions.joinAddress() : "";
     std::string now = address.empty() || g_joining ? "" : "Friends join at " + address;
     if (now != last)
     {
       last = now;
       text(s, now);
+    }
+  }
+  static bool copyDown = false;
+  static DWORD copiedUntil = 0;
+  if (void* copy = windowNamed(kCopy))
+  {
+    bool show = !address.empty() && !g_joining;
+    if (g_c.visible(copy, false) != show)
+      g_c.setVisible(copy, show);
+    if (clicked(copy, copyDown) && copyToClipboard(address))
+    {
+      text(copy, "Copied!");
+      copiedUntil = GetTickCount() + 2000;
+      TLMP_LOG("menu: copied the join address to the clipboard");
+    }
+    if (copiedUntil && GetTickCount() >= copiedUntil)
+    {
+      copiedUntil = 0;
+      text(copy, "Copy");
     }
   }
   if (!g_joining)

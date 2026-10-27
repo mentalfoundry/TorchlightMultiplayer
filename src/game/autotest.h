@@ -37,7 +37,8 @@ class Session;
 //   expect minioncopies <slot> <n> | nominioncopies <slot>  (copies of that player's minions here)
 //   expect minionhurt (ours)   hitminioncopy <slot> [damage]   killminion  useportal  (test only)
 //   clickslow <window>  (press, release next frame)   settext <window> <text>
-//   upnpprobe  (read-only: does a UPnP router answer?)   publicip <placeholder>   lookuppublicip (real)   waypoint <dungeon> <floor>  (as the waypoint menu does)   skilllevel <level> <skill name>  (invest)
+//   upnpprobe  (read-only: does a UPnP router answer?)   publicip <placeholder>   lookuppublicip (real)
+//   clipboard save|restore   expect clipboard <text>   waypoint <dungeon> <floor>  (as the waypoint menu does)   skilllevel <level> <skill name>  (invest)
 //   expect castsent <n> | castplayed <n>  (our casts sent / other players' casts shown here, since mark)
 //   walkto node [min distance]  (the nearest monster group not spawned yet)   teleport node [min]   teleport monster <min distance from the host>   teleport player <slot>
 //   expect dead|alive          expect town|dungeon       expect samelevel <slot>

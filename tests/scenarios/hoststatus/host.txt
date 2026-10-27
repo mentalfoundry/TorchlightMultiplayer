@@ -1,7 +1,13 @@
-# Diagnostics: the host's status line on the title screen (with a placeholder public address).
+# The host's status on the title screen (with a placeholder public address), and the Copy button:
+# it puts "IP:port" on the clipboard (the player's own clipboard text is put back afterwards).
 wait 4
 clickslow TLMP_HostButton timeout=60
 publicip 203.0.113.5
 wait 2
+clipboard save
+clickslow TLMP_CopyAddress timeout=10
+wait 0.5
 shot status
+expect clipboard 203.0.113.5:27960 timeout=5
+clipboard restore
 quit

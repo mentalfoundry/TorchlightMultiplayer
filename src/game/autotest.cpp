@@ -958,6 +958,22 @@ Poll expectCheck(const Step& s, std::string& why)
     why = std::to_string(n) + " copies still built from the type only";
     return n == 0 ? Poll::Done : Poll::Wait;
   }
+  if (what == "clipboard") // clipboard <text>: the clipboard holds exactly that text
+  {
+    std::string want = restFrom(s, 2), got;
+    if (OpenClipboard(nullptr))
+    {
+      HANDLE h = GetClipboardData(CF_UNICODETEXT);
+      if (auto* w = h ? static_cast<const wchar_t*>(GlobalLock(h)) : nullptr)
+      {
+        got = toUtf8(w);
+        GlobalUnlock(h);
+      }
+      CloseClipboard();
+    }
+    why = "'" + got + "'";
+    return got == want ? Poll::Done : Poll::Wait;
+  }
   if (what == "minioncopies") // minioncopies <slot> <n>: copies of that player's minions shown here
   {
     unsigned n = minions::copiesShown(static_cast<uint8_t>(intArg(s, 2)));
@@ -1637,6 +1653,37 @@ Poll run(const Step& s, bool begin, std::string& why)
   if (cmd == "townportal")
   {
     changeLevel(L"Town", -99);
+    return Poll::Done;
+  }
+  if (cmd == "clipboard" && s.args.size() > 1)
+  {
+    // Test only: clipboard save | restore (the player's own clipboard text survives a test run).
+    static std::wstring saved;
+    static bool hadText = false;
+    if (!OpenClipboard(nullptr))
+      return Poll::Wait;
+    if (s.args[1] == "save")
+    {
+      HANDLE h = GetClipboardData(CF_UNICODETEXT);
+      auto* w = h ? static_cast<const wchar_t*>(GlobalLock(h)) : nullptr;
+      hadText = w != nullptr;
+      saved = w ? w : L"";
+      if (w)
+        GlobalUnlock(h);
+    }
+    else if (hadText)
+    {
+      EmptyClipboard();
+      HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, (saved.size() + 1) * sizeof(wchar_t));
+      if (mem)
+      {
+        std::memcpy(GlobalLock(mem), saved.c_str(), (saved.size() + 1) * sizeof(wchar_t));
+        GlobalUnlock(mem);
+        if (!SetClipboardData(CF_UNICODETEXT, mem))
+          GlobalFree(mem);
+      }
+    }
+    CloseClipboard();
     return Poll::Done;
   }
   if (cmd == "publicip" && s.args.size() > 1)
