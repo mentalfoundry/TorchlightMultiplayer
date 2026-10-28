@@ -27,6 +27,7 @@
 #include "game/levelguard.h"
 #include "ogre_abi.h"
 #include "profile.h"
+#include "version.h"
 
 #include <windows.h>
 
@@ -274,7 +275,7 @@ static std::string sessionStatus()
 {
   char b[160];
   if (!g_session.isActive())
-    return "Co-op: not in a session";
+    return "Co-op: not in a session (TLMP " TLMP_VERSION ")";
   if (g_session.isHost())
   {
     // The address friends join at has its own big line (menu joinAddress); this one has the rest.
@@ -305,7 +306,7 @@ static std::string sessionStatus()
 static void start()
 {
   log::open();
-  TLMP_LOG("TLMP starting; game build stamp %08x", net::gameBuildStamp());
+  TLMP_LOG("TLMP %s starting; game build stamp %08x", TLMP_VERSION, net::gameBuildStamp());
   TLMP_LOG("command line: %ls", GetCommandLineW());
   if (const wchar_t* dir = profile::activeProfileDir())
     TLMP_LOG("profile: user data redirected to %ls", dir);

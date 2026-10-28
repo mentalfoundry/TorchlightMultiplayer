@@ -14,6 +14,19 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
   message(FATAL_ERROR "TLMP must be built as 32-bit (use -A Win32)")
 endif()
 
+# Build id ("2026-10-28 2da8e6f", "+" when built from uncommitted changes): logged at startup and
+# shown on the title screen, so players can tell whether they run the same build. Rewritten only
+# when it changes (build.ps1 configures on every build).
+execute_process(COMMAND git log -1 --format=%cd --date=short WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE TLMP_DATE OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+execute_process(COMMAND git describe --always --dirty=+ --abbrev=7 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE TLMP_REV OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT TLMP_REV)
+  set(TLMP_REV "unknown")
+endif()
+set(TLMP_VERSION "${TLMP_DATE} ${TLMP_REV}")
+configure_file(src/version.h.in ${CMAKE_BINARY_DIR}/generated/version.h @ONLY)
+
 find_package(minhook CONFIG REQUIRED)
 find_package(unofficial-enet CONFIG REQUIRED)
 
@@ -49,7 +62,7 @@ add_library(TLMP SHARED
   src/game/hooks.cpp
   src/TLMP.def
 )
-target_include_directories(TLMP PRIVATE src)
+target_include_directories(TLMP PRIVATE src ${CMAKE_BINARY_DIR}/generated)
 target_compile_definitions(TLMP PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
 target_compile_options(TLMP PRIVATE /W4 /permissive- /utf-8)
 target_link_libraries(TLMP PRIVATE minhook::minhook unofficial::enet::enet ws2_32 winmm)

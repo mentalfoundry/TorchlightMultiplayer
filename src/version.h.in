@@ -1,0 +1,4 @@
+#pragma once
+
+// Generated from src/version.h.in by CMake (CMakeLists.txt).
+#define TLMP_VERSION "@TLMP_VERSION@"

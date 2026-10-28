@@ -3,7 +3,18 @@
 Adds host-authoritative co-op (up to 4 players) to Torchlight 1, **GOG build 1.7.8.70 only**:
 the hooks rely on fixed addresses, and other builds are refused at startup.
 
-## Build & install
+## For players: the release zip
+
+`.\tools\package.ps1` builds `dist\TLMP-<date>-<rev>.zip`: the two DLLs, a default `TLMP.ini`,
+`Install.bat` / `Uninstall.bat` and a `README.txt` written for players (what to install, how to host
+and join). Players extract it and run `Install.bat`, which finds the Torchlight folder (next to the
+files, GOG's registry entry, Steam's default folder, or asks), refuses other Torchlight builds, asks
+for administrator rights only when the folder needs them, and does what `install.ps1` does below.
+Commit before packaging: the build id (`git describe`, shown on the title screen and in the log)
+ends in `+` for uncommitted changes, and everyone in a session should run the same build. The PDBs
+go to `dist\symbols\<name>\` for reading crash logs from that build.
+
+## Build & install (development)
 
 ```powershell
 .\build.ps1                 # 32-bit, static CRT; needs VS 2026 + vcpkg (minhook, enet: x86-windows-static)

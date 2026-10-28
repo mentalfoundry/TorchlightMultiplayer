@@ -16,3 +16,6 @@
 # Python
 __pycache__/
 *.pyc
+
+# Release packages (tools/package.ps1)
+/dist/
