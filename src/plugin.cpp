@@ -220,6 +220,14 @@ static std::string sessionName()
   return character.empty() ? g_config.playerName : character;
 }
 
+// The host's party settings (its own, or as received): monster health, damage and kill XP by party size.
+static void applyPartyRules(const net::PartyRules& rules)
+{
+  game::monsters::setHealthPerPlayer(rules.healthPerPlayer);
+  game::combat::setRules(rules);
+  game::loot::setLootBonus(rules.lootPerPlayer);
+}
+
 // Starts hosting, or joining "host[:port]". False if a session is already running or it failed.
 static bool beginSession(NetMode mode, const std::string& address)
 {
@@ -238,9 +246,9 @@ static bool beginSession(NetMode mode, const std::string& address)
     }
     g_config.address = address;
   }
-  g_session.setPartyRules(c.healthPerPlayer);
+  g_session.setPartyRules(c.rules);
   if (mode == NetMode::Host)
-    game::monsters::setHealthPerPlayer(c.healthPerPlayer);
+    applyPartyRules(c.rules);
   if (!g_session.start(c, g_callbacks))
   {
     game::showMessage(mode == NetMode::Host ? "Could not start hosting (is the port in use?)" : "Could not connect.", 6.0f);
@@ -373,7 +381,7 @@ static void start()
     game::floor::onReconnected();
     game::showMessage("Reconnected to the host.", 4.0f);
   };
-  cb.onPartyRules = [](float healthPerPlayer) { game::monsters::setHealthPerPlayer(healthPerPlayer); };
+  cb.onPartyRules = [](const net::PartyRules& rules) { applyPartyRules(rules); };
   cb.onGameMessage = [](uint8_t from, net::Msg type, net::Reader& r) { dispatch(from, type, r); };
   game::monsters::attach(&g_session);
   game::floor::attach(&g_session);

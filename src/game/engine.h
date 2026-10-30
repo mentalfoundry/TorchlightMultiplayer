@@ -391,6 +391,7 @@ constexpr uintptr_t kGiveFame = 0x004880E0;
 using GiveRewardFn = void(__thiscall*)(Unit* unit, Level* level, Unit* victim, int amount, char raw);
 inline const auto GiveExperience = reinterpret_cast<GiveRewardFn>(kGiveExperience);
 inline const auto GiveFame = reinterpret_cast<GiveRewardFn>(kGiveFame);
+constexpr uint32_t kMinionOwner = 0x5B4;  // CCharacter: the master of a minion or pet (SetMaster 0x499E70)
 constexpr uint32_t kUnitXpReward = 0x3D4;   // CCharacter: XP its killer gets (TakeDamage zeroes it)
 constexpr uint32_t kUnitFameReward = 0x3D8; // CCharacter: fame its killer gets
 
@@ -503,6 +504,14 @@ inline void setPosition(Unit* unit, const Vec3& p)
 // XP is not here: TakeDamage pays that.
 constexpr uintptr_t kDropTreasureTable = 0x004F7790;
 constexpr uintptr_t kDropTreasure = 0x004F7A40;
+// The treasure table itself: Kill hands the unit's table (+0x614) to 0x5FF560, which resolves it via
+// 0x5FF240 -> CSpawnClass 0x53ABB0 (thiscall(spawnClass, 10 args) ret 0x28): entries at +0x8 (count
+// +0xC), each { data*, target* }, weight at data+0x8 (-1 = always). Positive weights go into a weighted
+// bag (0x5BF910) and one entry is drawn. The target is a CSpawnClassData: its source text at +0x8
+// (std::wstring, e.g. "UNITTYPE:NONE", "SPAWNCLASS:TREASURE"), sub-table +0x50, and +0x54 set for
+// NONE (drawing it ends the pick with nothing).
+// Data: media/Spawnclasses/*.DAT.adm (re/adm.py decodes them).
+constexpr uintptr_t kSpawnClassPick = 0x0053ABB0;
 constexpr uintptr_t kKillTableRollReturn = 0x004AACDB;
 constexpr uintptr_t kKillDefaultRollReturn = 0x004AAC6E;
 inline void kill(Unit* unit, Unit* killer = nullptr)

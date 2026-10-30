@@ -81,6 +81,14 @@ bool isTownLevel(uint32_t levelId)
   return levelId == town;
 }
 
+int playersInGame()
+{
+  int n = 0;
+  for (uint8_t s = 0; s < net::kMaxPlayers; s++)
+    n += slotInGame(s) ? 1 : 0;
+  return n < 1 ? 1 : n;
+}
+
 bool slotInGame(uint8_t slot)
 {
   if (!connected())

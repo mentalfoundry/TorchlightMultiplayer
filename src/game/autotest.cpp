@@ -11,6 +11,7 @@
 #include "game/loot.h"
 #include "game/monsters.h"
 #include "game/party.h"
+#include "game/combat.h"
 #include "game/minions.h"
 #include "game/minimap.h"
 #include "game/skills.h"
@@ -75,6 +76,8 @@ std::set<std::string> g_syncSeen[net::kMaxPlayers];
 std::vector<std::string> g_notices; // every notice shown, in order
 size_t g_noticeMark = 0;
 int g_xpMark = 0;
+unsigned g_shareCount = 0; // kill shares worked out before the last mark
+unsigned g_bonusMark = 0;  // loot bonus tables before the last mark
 float g_healthMark = 0.0f;
 uint32_t g_levelMark = 0;
 unsigned g_monstersMark = 0;
@@ -992,6 +995,32 @@ Poll expectCheck(const Step& s, std::string& why)
         c = '|';
     return got.find(want) != std::string::npos ? Poll::Done : Poll::Wait;
   }
+  if (what == "lootbonus" && s.args.size() > 2) // lootbonus <near>: a kill's table got the party bonus since mark
+  {
+    loot::Bonus b = loot::lastBonus();
+    why = std::to_string(b.count - g_bonusMark) + " tables since mark, last " + std::to_string(b.nearby) + " near: " +
+          std::to_string(b.before * 100.0f) + "% -> " + std::to_string(b.after * 100.0f) + "%";
+    return b.count > g_bonusMark && b.nearby == intArg(s, 2) && b.after > b.before ? Poll::Done : Poll::Wait;
+  }
+  if (what == "damagescale" && s.args.size() > 2) // damagescale <x>: the last monster hit run here was scaled by x
+  {
+    float want = floatArg(s, 2, 1.0f), got = combat::lastDamageScale();
+    why = "x" + std::to_string(got);
+    return std::fabs(got - want) < 0.001f ? Poll::Done : Poll::Wait;
+  }
+  if (what == "xpshare" && s.args.size() > 4) // xpshare <near> <min%> <max%>: our last kill share since mark
+  {
+    combat::Share sh = combat::lastShare();
+    if (!sh.valid || sh.base <= 0 || combat::sharesGiven() <= g_shareCount)
+    {
+      why = "no share since mark";
+      return Poll::Wait;
+    }
+    float pct = 100.0f * static_cast<float>(sh.given) / static_cast<float>(sh.base);
+    why = std::to_string(sh.base) + " XP -> " + std::to_string(sh.given) + " (" + std::to_string(pct) + "%), " +
+          std::to_string(sh.nearby) + " near of " + std::to_string(sh.players) + ", level gap x" + std::to_string(sh.gap);
+    return sh.nearby == intArg(s, 2) && pct >= floatArg(s, 3) && pct <= floatArg(s, 4) ? Poll::Done : Poll::Wait;
+  }
   if (what == "mapmarker" && s.args.size() > 2) // mapmarker <slot>: their minimap marker is on their stand-in
   {
     uint8_t slot = static_cast<uint8_t>(std::atoi(s.args[2].c_str()));
@@ -1273,6 +1302,8 @@ Poll run(const Step& s, bool begin, std::string& why)
   if (cmd == "mark")
   {
     g_xpMark = myXp();
+    g_shareCount = combat::sharesGiven();
+    g_bonusMark = loot::lastBonus().count;
     g_healthMark = me() ? engine::field<float>(me(), engine::kUnitHealth) : 0.0f;
     g_itemsMark = backpackItems();
     g_levelMark = levelId(currentLevel());

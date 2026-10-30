@@ -6,5 +6,8 @@ ingame timeout=90
 sync ingame timeout=120
 sync start timeout=60
 sync fought timeout=120
+# Party size (Diablo 2): with 2 players in the game, monster hits are x1.0625 (scaled here, where
+# the monsters run).
+expect damagescale 1.0625 timeout=10
 sync end timeout=60
 quit

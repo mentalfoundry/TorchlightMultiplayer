@@ -63,7 +63,10 @@ static void __fastcall killHook(void* self, void* edx, int killer, const void* d
 {
   if (game::monsters::shouldBlockKill(self))
     return;
-  g_kill(self, edx, game::combat::killerFor(self, killer), dir, force, flag);
+  int payee = game::combat::killerFor(self, killer);
+  game::loot::beginKill(self, payee); // the party loot bonus applies to this kill's treasure
+  g_kill(self, edx, payee, dir, force, flag);
+  game::loot::endKill();
 }
 
 // CCharacter::TakeDamage -- hits on monster copies go to the host, hits on stand-ins to their owner.
@@ -119,7 +122,7 @@ static GiveRewardHookFn g_giveFame = nullptr;
 
 static void __fastcall giveExperienceHook(void* self, void* edx, void* level, void* victim, int amount, char raw)
 {
-  if (game::combat::allowReward(self, level, victim, amount, raw, false))
+  if (game::combat::allowReward(self, level, victim, amount, raw, false)) // may set this player's share
     g_giveExperience(self, edx, level, victim, amount, raw);
 }
 
@@ -485,6 +488,21 @@ static void __fastcall keyMessageHook(void* keys, void* edx, uint32_t msg, uint3
   g_keyMessage(keys, edx, msg, vk);
 }
 
+// CSpawnClass resolve (0x53ABB0, thiscall, ret 0x28): picks a treasure table's entries by weight. The
+// party loot bonus lightens its "nothing" entries for the length of the call (loot.h).
+using SpawnPickFn = int(__fastcall*)(void* spawnClass, void* edx, void* a2, void* a3, void* a4, void* a5, void* a6,
+                                     int a7, int a8, int a9, void* a10, void* a11);
+static SpawnPickFn g_spawnPick = nullptr;
+
+static int __fastcall spawnPickHook(void* spawnClass, void* edx, void* a2, void* a3, void* a4, void* a5, void* a6,
+                                    int a7, int a8, int a9, void* a10, void* a11)
+{
+  game::loot::PickWeights w = game::loot::beforePick(spawnClass);
+  int result = g_spawnPick(spawnClass, edx, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+  game::loot::afterPick(w);
+  return result;
+}
+
 // CLevel's once-a-second activity pass (0x4F7340, thiscall(level, pos), ret 4): its lists are
 // checked for freed entries first (levelguard.h).
 using ActivityPassFn = void(__fastcall*)(void* level, void* edx, void* pos);
@@ -711,7 +729,9 @@ bool install()
       !hook(0x004F7340, reinterpret_cast<void*>(&activityPassHook), reinterpret_cast<void**>(&g_activityPass),
             "CLevel::UpdateActivity") ||
       !hook(engine::kKeyManagerOnMessage, reinterpret_cast<void*>(&keyMessageHook),
-            reinterpret_cast<void**>(&g_keyMessage), "CKeyManager::OnMessage"))
+            reinterpret_cast<void**>(&g_keyMessage), "CKeyManager::OnMessage") ||
+      !hook(engine::kSpawnClassPick, reinterpret_cast<void*>(&spawnPickHook), reinterpret_cast<void**>(&g_spawnPick),
+            "CSpawnClass::Pick"))
     return false;
   if (!hook(engine::kUseSkill, reinterpret_cast<void*>(&useSkillHook), reinterpret_cast<void**>(&g_useSkill),
             "CCharacter::UseSkill"))

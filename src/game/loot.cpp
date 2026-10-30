@@ -1,4 +1,6 @@
 #include "game/loot.h"
+#include <cmath>
+#include "game/combat.h"
 #include "game/diag.h"
 #include "game/engine.h"
 #include "game/internal.h"
@@ -376,6 +378,131 @@ void forEachShared(void (*fn)(uint32_t key, void* unit, void* ctx), void* ctx)
 {
   for (auto& [key, s] : g_items)
     fn(key, s.local, ctx);
+}
+
+// --- party loot bonus ------------------------------------------------------------------------------
+
+namespace {
+float g_lootPerPlayer = 0.25f;
+void* g_killVictim = nullptr; // a kill paying out to the local player is under way
+int g_pickDepth = 0;          // nesting of table resolutions within it (sub-tables are left alone)
+Bonus g_lastBonus;
+unsigned g_tablesLogged = 0;
+
+// The killer is this machine's player, or its pet or one of its minions.
+bool killerIsLocal(int killer)
+{
+  uintptr_t me = localPlayer();
+  if (!me || !killer)
+    return false;
+  auto k = static_cast<uintptr_t>(killer);
+  return k == me || k == localPet() ||
+         engine::field<uintptr_t>(reinterpret_cast<void*>(k), engine::kMinionOwner) == me;
+}
+} // namespace
+
+void setLootBonus(float perPlayer)
+{
+  g_lootPerPlayer = perPlayer < 0.0f ? 0.0f : perPlayer;
+  TLMP_LOG("loot: drop chance bonus %.2f per other player near a kill", g_lootPerPlayer);
+}
+
+void beginKill(void* victim, int killer)
+{
+  g_killVictim = g_session && g_session->isConnected() && g_lootPerPlayer > 0.0f && killerIsLocal(killer) ? victim
+                                                                                                         : nullptr;
+  g_pickDepth = 0;
+}
+
+void endKill()
+{
+  g_killVictim = nullptr;
+  g_pickDepth = 0;
+}
+
+PickWeights beforePick(void* spawnClass)
+{
+  PickWeights w;
+  if (!g_killVictim || !spawnClass)
+    return w;
+  w.counted = true;
+  if (g_pickDepth++ > 0)
+    return w; // a sub-table: the monster's own table already decided whether anything drops
+  int extra = combat::playersNear(static_cast<engine::Unit*>(g_killVictim)) - 1;
+  // Entries: CSpawnClass +0x8 array of entry*, +0xC count; entry = { data*, target* }; weight at
+  // data +0x8 (-1: always); the target (CSpawnClassData) keeps the entry's text at +0x8, and
+  // "UNITTYPE:NONE" is the one that drops nothing (its +0x54 flag lets the pick stop there).
+  uintptr_t sc = reinterpret_cast<uintptr_t>(spawnClass);
+  uint32_t array = 0, count = 0;
+  if (!diag::readU32(sc + 0x8, array) || !diag::readU32(sc + 0xC, count) || !array || count == 0 || count > 64)
+    return w;
+  double none = 0.0, other = 0.0;
+  for (uint32_t i = 0; i < count; i++)
+  {
+    uint32_t entry = 0, data = 0, target = 0, weight = 0;
+    if (!diag::readU32(array + i * 4, entry) || !diag::readU32(entry, data) || !diag::readU32(entry + 4, target) ||
+        !diag::readU32(data + 8, weight))
+      return w;
+    int wt = static_cast<int>(weight);
+    // The entry's source text (CSpawnClassData +0x8, a std::wstring): "UNITTYPE:NONE" drops nothing.
+    wchar_t what[64] = L"";
+    diag::readWStringAny(target + 0x8, what, 64);
+    bool nothing = _wcsicmp(what, L"UNITTYPE:NONE") == 0;
+    if (g_tablesLogged < 3)
+      TLMP_LOG("loot: table %p entry %u: weight %d, %ls", spawnClass, i, wt, what);
+    if (wt <= 0)
+      continue;
+    if (!nothing)
+      other += wt;
+    else
+    {
+      none += wt;
+      if (w.count < 8)
+      {
+        w.weight[w.count] = reinterpret_cast<int*>(data + 8);
+        w.saved[w.count] = wt;
+        w.count++;
+      }
+    }
+  }
+  g_tablesLogged++;
+  if (extra <= 0 || none <= 0.0 || other <= 0.0)
+  {
+    w.count = 0;
+    return w;
+  }
+  // "Nothing" with probability p becomes p^N: the NONE weight that gives that, shared out over the
+  // NONE entries in proportion.
+  double n = 1.0 + g_lootPerPlayer * extra;
+  double p = none / (none + other);
+  double q = std::pow(p, n);
+  double newNone = other * q / (1.0 - q);
+  for (int i = 0; i < w.count; i++)
+    *w.weight[i] = static_cast<int>(std::lround(w.saved[i] * newNone / none));
+  g_lastBonus.before = static_cast<float>(1.0 - p);
+  double total = 0.0;
+  for (int i = 0; i < w.count; i++)
+    total += *w.weight[i];
+  g_lastBonus.after = static_cast<float>(other / (other + total));
+  g_lastBonus.nearby = extra + 1;
+  g_lastBonus.count++;
+  if (g_lastBonus.count <= 20)
+    TLMP_LOG("loot: %d players near the kill: drop chance %.1f%% -> %.1f%%", extra + 1, g_lastBonus.before * 100.0f,
+             g_lastBonus.after * 100.0f);
+  return w;
+}
+
+void afterPick(const PickWeights& w)
+{
+  for (int i = 0; i < w.count; i++)
+    *w.weight[i] = w.saved[i];
+  if (w.counted && g_pickDepth > 0)
+    g_pickDepth--;
+}
+
+Bonus lastBonus()
+{
+  return g_lastBonus;
 }
 
 } // namespace tlmp::game::loot

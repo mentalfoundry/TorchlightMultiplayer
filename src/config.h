@@ -1,5 +1,7 @@
 #pragma once
 
+#include "net/protocol.h"
+
 #include <cstdint>
 #include <string>
 
@@ -19,7 +21,7 @@ struct Config
   uint16_t port = 27960;
   bool upnp = true;            // host: open the port on the router with UPnP ([net] upnp; off in test mode)
   std::string playerName = "Adventurer";
-  float healthPerPlayer = 0.5f; // host: monster health added per player beyond the first ([party])
+  net::PartyRules rules;       // host: monster scaling and XP per party size ([party])
   uint32_t devWorldSeed = 0; // -tlmp-worldseed N: act as if a host sent N (testing only)
   std::wstring repairPetType;  // -tlmp-repairpet <Type> <Name>: give a pet-less character its pet back
   std::wstring repairPetName;

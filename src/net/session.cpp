@@ -26,6 +26,26 @@ int ENET_CALLBACK interceptIncoming(ENetHost*, ENetEvent*)
 
 } // namespace
 
+static void writeRules(Writer& w, const PartyRules& rules)
+{
+  w.f32(rules.healthPerPlayer);
+  w.f32(rules.damagePerPlayer);
+  w.u8(static_cast<uint8_t>(rules.experience));
+  w.u8(rules.levelGap ? 1 : 0);
+  w.f32(rules.lootPerPlayer);
+}
+
+static PartyRules readRules(Reader& r)
+{
+  PartyRules rules;
+  rules.healthPerPlayer = r.f32();
+  rules.damagePerPlayer = r.f32();
+  rules.experience = static_cast<ExperienceModel>(r.u8());
+  rules.levelGap = r.u8() != 0;
+  rules.lootPerPlayer = r.f32();
+  return rules;
+}
+
 void Session::dropIncomingFor(float seconds)
 {
   g_dropIncomingUntil = GetTickCount() + static_cast<uint32_t>(seconds * 1000.0f);
@@ -401,9 +421,9 @@ void Session::handlePacket(ENetPeer* peer, const uint8_t* data, size_t size)
       uint32_t seed = r.u32();
       if (r.ok() && m_cb.onWorldSeed)
         m_cb.onWorldSeed(seed);
-      float healthPerPlayer = r.f32();
+      PartyRules rules = readRules(r);
       if (r.ok() && m_cb.onPartyRules)
-        m_cb.onPartyRules(healthPerPlayer);
+        m_cb.onPartyRules(rules);
       break;
     }
     case Msg::PlayerInfo:
@@ -499,7 +519,7 @@ void Session::hostOnHello(ENetPeer* peer, Reader& r)
   {
     Writer ws(Msg::WorldSeed);
     ws.u32(m_worldSeed);
-    ws.f32(m_healthPerPlayer);
+    writeRules(ws, m_rules);
     send(peer, ws, kChanReliable, true);
   }
   for (uint8_t s = 0; s < kMaxPlayers; s++)
@@ -602,7 +622,7 @@ void Session::sendWorldSeed(uint32_t seed)
   TLMP_LOG("net: announcing world seed %u", seed);
   Writer w(Msg::WorldSeed);
   w.u32(seed);
-  w.f32(m_healthPerPlayer);
+  writeRules(w, m_rules);
   broadcast(w, kChanReliable, true, kInvalidSlot);
 }
 

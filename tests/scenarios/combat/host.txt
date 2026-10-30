@@ -9,6 +9,8 @@ sync start timeout=60
 # The client fights first (near us: it walked to us).
 sync clientkilled timeout=150
 expect xpgain
+# Both near the kill (Diablo 2): x1.5 for 2 players, +35% for sharing, half each at equal levels.
+expect xpshare 2 85 120
 sync dump1 timeout=30
 dump afterclientkill
 shot afterclientkill
@@ -19,6 +21,9 @@ sync hostready timeout=30
 sync clientnear timeout=30
 killnear timeout=30
 expect xpgain
+expect xpshare 2 85 120 timeout=10
+# Loot bonus: the client is near, so our roll drops "nothing" less often.
+expect lootbonus 2 timeout=10
 wait 3
 sync dump2 timeout=60
 dump afterhostkill

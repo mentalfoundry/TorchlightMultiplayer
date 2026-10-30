@@ -60,6 +60,10 @@ void discardOwn();
 void onUnitDestroyed(void* unit);
 // Monster health added per player in the game beyond the first (the host's setting; 0.5 = +50%).
 void setHealthPerPlayer(float perPlayer);
+// The current health multiplier for the party size (1 + healthPerPlayer x extra players).
+float healthScale();
+// A monster the floor's owner runs (not a pet, minion, stand-in or friendly NPC).
+bool isHostile(engine::Unit* unit);
 // Test mode: the range of party multipliers on the monsters this machine runs (false: none).
 bool scaleRange(float* lo, float* hi);
 // Test mode: the same for the copies shown here (as their owner reported).

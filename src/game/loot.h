@@ -31,6 +31,32 @@ bool allowPickUp(void* character, void* item, void* level);
 
 void beforeSave();
 
+// Party loot bonus (PartyRules::lootPerPlayer). While a kill pays out to the local player (its own,
+// its pet's or minions'; the Kill hook brackets it), the monster's treasure table drops "nothing"
+// less often: a table (CSpawnClass, resolved by 0x53ABB0) weighs its entries, and the UNITTYPE:NONE
+// ones are made lighter for that one call, then put back.
+void setLootBonus(float perPlayer);
+void beginKill(void* victim, int killer);
+void endKill();
+struct PickWeights
+{
+  int* weight[8] = {};
+  int saved[8] = {};
+  int count = 0;
+  bool counted = false; // beforePick counted a nesting level (afterPick undoes it)
+};
+PickWeights beforePick(void* spawnClass);
+void afterPick(const PickWeights& w);
+// Tests: the last table the bonus changed: its chance of dropping something before and after, and
+// the players near that kill.
+struct Bonus
+{
+  float before = 0.0f, after = 0.0f;
+  int nearby = 0;
+  unsigned count = 0; // tables changed so far
+};
+Bonus lastBonus();
+
 // Test mode: every shared item this machine knows of (unit null while not on the ground here).
 void forEachShared(void (*fn)(uint32_t key, void* unit, void* ctx), void* ctx);
 void onLevelDestroyed(void* level);

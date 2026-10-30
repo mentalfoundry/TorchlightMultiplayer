@@ -66,6 +66,9 @@ bool partyFloorElsewhere();
 bool isTownLevel(uint32_t levelId);
 // Each player's whereabouts as this machine knows them.
 bool slotInGame(uint8_t slot);
+// Players in the game (not on the title screen or loading), at least 1: the party size monster
+// health, damage and kill XP scale by.
+int playersInGame();
 uint32_t slotLevel(uint8_t slot);
 
 // --- routing ------------------------------------------------------------------------------

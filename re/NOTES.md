@@ -296,3 +296,13 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   20 s / 45 s (session.cpp). The host's deliberate disconnect carries kGoodbye; anything else is a
   lost connection, which the client retries for a minute (Hello carries a per-run token, so the host
   gives the slot back, dropping the stale connection if it hasn't timed out yet).
+
+## Treasure tables (2026-10-31)
+- Data: media/Spawnclasses/*.DAT.adm (decode with re/adm.py). A table is weighted entries
+  (SPAWNCLASS:x or UNITTYPE:x, WEIGHT, -1 = always, MINCOUNT/MAXCOUNT, MAGICFIND, LEVEL_BONUS,
+  FORCEENCHANT); "UNITTYPE:NONE" is the chance of nothing (Diablo 2's NoDrop). A monster's [TREASURE]
+  names its table; GOBLIN_TREASURE (71 monster types) is NONE 92 / TREASURE 8.
+- Kill -> 0x5FF560(table +0x614) -> 0x5FF240 -> CSpawnClass 0x53ABB0 (thiscall, ret 0x28): entries at
+  +0x8 (count +0xC), entry = { data*, target* }, weight at data+0x8. Target = CSpawnClassData: source
+  text std::wstring at +0x8 ("UNITTYPE:NONE"), sub-table +0x50, +0x54 set for NONE. Weights go into a
+  weighted bag (0x5BF910) and one entry is drawn; nested tables resolve through the same function.

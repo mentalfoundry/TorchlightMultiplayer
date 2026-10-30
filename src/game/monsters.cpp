@@ -235,17 +235,19 @@ void setHealthPerPlayer(float perPlayer)
   g_healthPerPlayer = perPlayer;
 }
 
-static int playersInGame()
-{
-  int n = 0;
-  for (uint8_t s = 0; s < net::kMaxPlayers; s++)
-    n += floor::slotInGame(s) ? 1 : 0;
-  return n < 1 ? 1 : n;
-}
-
 static float scaleNow()
 {
-  return 1.0f + g_healthPerPlayer * static_cast<float>(playersInGame() - 1);
+  return 1.0f + g_healthPerPlayer * static_cast<float>(floor::playersInGame() - 1);
+}
+
+float healthScale()
+{
+  return scaleNow();
+}
+
+bool isHostile(engine::Unit* unit)
+{
+  return isHostileMonster(unit);
 }
 
 // Max health is (base + bonus) scaled by stats, plus a flat stat: scaling base and bonus scales it.
@@ -439,7 +441,7 @@ static void hostTick()
     {
       g_fullStateDue = true;
       TLMP_LOG("monsters: [owner] %d player(s) in the game: monster health x%.2f (%u monsters adjusted)",
-               playersInGame(), to, changed);
+               floor::playersInGame(), to, changed);
     }
   }
   if (now >= g_nextState)

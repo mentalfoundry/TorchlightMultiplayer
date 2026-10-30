@@ -4,7 +4,10 @@ players 2 timeout=90
 click ContinueLast timeout=90
 ingame timeout=90
 sync ingame timeout=120
-sync back timeout=300
+# The drop (noticed after 20-45 s), then the client back in its old slot.
+expect noavatar 1 timeout=120
+players 2 timeout=180
+sync back timeout=120
 expect avatar 1 timeout=30
 expect samelevel 1 timeout=30
 expect owner 0 timeout=30

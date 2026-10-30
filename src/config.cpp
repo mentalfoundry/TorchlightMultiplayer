@@ -52,9 +52,16 @@ Config loadConfig()
   cfg.port = static_cast<uint16_t>(GetPrivateProfileIntA("net", "port", cfg.port, ini));
   cfg.upnp = GetPrivateProfileIntA("net", "upnp", 1, ini) != 0;
   GetPrivateProfileStringA("player", "name", cfg.playerName.c_str(), buf, sizeof(buf), ini);
-  GetPrivateProfileStringA("party", "monster_health_per_player", "0.5", buf, sizeof(buf), ini);
-  cfg.healthPerPlayer = static_cast<float>(std::atof(buf));
   cfg.playerName = buf;
+  GetPrivateProfileStringA("party", "monster_health_per_player", "0.5", buf, sizeof(buf), ini);
+  cfg.rules.healthPerPlayer = static_cast<float>(std::atof(buf));
+  GetPrivateProfileStringA("party", "monster_damage_per_player", "0.0625", buf, sizeof(buf), ini);
+  cfg.rules.damagePerPlayer = static_cast<float>(std::atof(buf));
+  GetPrivateProfileStringA("party", "experience", "diablo2", buf, sizeof(buf), ini);
+  cfg.rules.experience = _stricmp(buf, "full") == 0 ? net::ExperienceModel::Full : net::ExperienceModel::Diablo2;
+  cfg.rules.levelGap = GetPrivateProfileIntA("party", "experience_level_gap", 1, ini) != 0;
+  GetPrivateProfileStringA("party", "loot_bonus_per_player", "0.25", buf, sizeof(buf), ini);
+  cfg.rules.lootPerPlayer = static_cast<float>(std::atof(buf));
 
   int argc = 0;
   wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);

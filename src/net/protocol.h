@@ -15,7 +15,7 @@
 namespace tlmp::net {
 
 constexpr uint32_t kMagic = 0x504D4C54; // "TLMP"
-constexpr uint16_t kProtocolVersion = 30;
+constexpr uint16_t kProtocolVersion = 31;
 constexpr int kMaxPlayers = 4;
 // Disconnect data the host sends when it ends the session on purpose (leaving or quitting). Any
 // other disconnect is a lost connection, which clients try to get back (Session::poll).
@@ -102,6 +102,26 @@ enum class RejectReason : uint8_t
   Full = 1,
   BadVersion,
   BadGameBuild,
+};
+
+// The host's party settings, which everyone plays by (sent with the world seed). Modelled on
+// Diablo 2 (v1.10+): for every player in the game beyond the first, monsters get +50% health and
+// +6.25% damage; a kill's XP grows with the health, gets +35% when it is shared, and is split
+// between the players near it by level, less for players far from the monster's level.
+enum class ExperienceModel : uint8_t
+{
+  Full = 0,    // everyone near a kill gets its whole XP (TLMP before the D2 model)
+  Diablo2 = 1, // x(1 + healthPerPlayer x extra players), +35% when shared, split by level
+};
+struct PartyRules
+{
+  float healthPerPlayer = 0.5f;    // monster health added per player beyond the first
+  float damagePerPlayer = 0.0625f; // monster damage added per player beyond the first
+  ExperienceModel experience = ExperienceModel::Diablo2;
+  bool levelGap = true; // Diablo2: a share shrinks from 100% at 5 levels from the monster to 5% at 10
+  // Loot bonus for playing together: a kill's "nothing drops" chance p becomes p^N, N = 1 + this x the
+  // other players near the kill (Diablo 2's NoDrop rule, gentler). Guaranteed drops are unchanged.
+  float lootPerPlayer = 0.25f;
 };
 
 // Slow-changing description of a player's character, sent reliably on change.

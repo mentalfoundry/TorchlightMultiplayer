@@ -13,6 +13,8 @@ walkto monster timeout=40
 mark
 killnear timeout=30
 expect xpgain
+# Both near the kill (Diablo 2): x1.5 for 2 players, +35% for sharing, half each at equal levels.
+expect xpshare 2 85 120 timeout=10
 # Loot is per player: our own game must roll our own loot for every kill we share in. What a roll
 # drops is random -- often nothing, which is fine -- so the check is the rolls, not the ground.
 killnear timeout=30
@@ -32,6 +34,8 @@ teleport player 0 timeout=20
 sync clientnear timeout=30
 sync dump2 timeout=120
 expect xpgain
+expect xpshare 2 85 120 timeout=10
+expect lootbonus 2 timeout=10
 dump afterhostkill
 shot afterhostkill
 sync end timeout=60

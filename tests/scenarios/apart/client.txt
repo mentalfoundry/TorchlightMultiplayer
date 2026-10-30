@@ -12,6 +12,11 @@ mark
 hit 1
 expect hurt timeout=30
 shot fighting
+# Killed alone (the host is far): 2 players in the game make the kill worth x1.5, nobody near to
+# share it with, so no +35% and no split.
+mark
+killnear timeout=30
+expect xpshare 1 140 160 timeout=20
 sync fought timeout=30
 sync end timeout=60
 quit

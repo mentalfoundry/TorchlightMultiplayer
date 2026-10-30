@@ -96,17 +96,29 @@ open and close while tests run; avoid typing during a run (the game reads some k
   handed over), so the dungeon keeps running.
 - **Events.** Scripted trigger areas outside town fire only once everyone in the game is together
   (within about 15 units), with "waiting for ..." messages on screen.
-- **Combat.** Hits go to the machine running the floor; XP and fame are shared within 50 units.
+- **Combat.** Hits go to the machine running the floor; XP and fame go to the players within 50
+  units of a kill (see Party size for how XP is split).
   Monsters, champions included, are exact copies on every machine (names, health, positions).
 - **Loot.** Each player rolls their own loot for every kill they share in (often nothing, as in single
-  player). Items a player drops are shared: whoever picks one up first gets it.
+  player). Playing together helps: for each other player near a kill, the "drops nothing" chance p of
+  your roll becomes p^N, N = 1 + 0.25 per other player (Diablo 2's NoDrop rule, gentler): an ordinary
+  monster's 8% drop chance becomes 9.9% with 2 players near, 11.8% with 3, 13.6% with 4. Champions'
+  and bosses' sure drops are unchanged (`[party] loot_bonus_per_player`, 0 = off). Items a player
+  drops are shared: whoever picks one up first gets it.
 - **Skills.** When you use a skill, everyone else's game has your character cast it too, aimed the
   same way: missiles, effects and summoned minions show up for everyone. Those casts are for show;
   damage only comes from your own game. Your minions are kept like your pet: everyone sees them
   where they are, with their health, and monsters that hit them hurt your real minions.
-- **Party size.** Monsters get +50% health for each player in the game beyond the first (x1.5 for
-  two, x2.5 for four), adjusted as players join and leave. The host sets it in `TLMP.ini`
-  (`[party] monster_health_per_player`, 0 = off); everyone plays by the host's setting.
+- **Party size** works as in Diablo 2 (v1.10+). For each player in the game beyond the first,
+  monsters get +50% health (x1.5 for two players, x2.5 for four, adjusted as players join and leave)
+  and +6.25% damage (+18.75% for four). A kill's XP grows like the health, gets +35% when more than
+  one player is near it, and is split between the players near it in proportion to their levels; a
+  player more than 5 levels from the monster gets less of their share (81% at 6 levels, down to 5% at
+  10 or more). Two players of the same level near a kill get about 101% of its solo XP each, four get
+  about 84% (but kill faster); a player alone gets x1.5 per extra player in the game. Fame is not
+  split. The host sets all of this in `TLMP.ini` (`[party]`: `monster_health_per_player`,
+  `monster_damage_per_player`, `experience=diablo2|full`, `experience_level_gap`,
+  `loot_bonus_per_player`); everyone plays by the host's settings.
 - **Death.** Each player gets their own death screen.
 - **Party frames and map.** Under your pet's portrait (top left) every other player has a frame: name,
   level and a health bar, greyed out while they're dead, with a note when they're in town, on another

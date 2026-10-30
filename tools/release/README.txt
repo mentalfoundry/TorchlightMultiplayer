@@ -38,8 +38,12 @@ PLAYING TOGETHER
 - Chat: press Enter, type, press Enter to send (Esc cancels).
 - Your friends' names, levels and health are shown under your pet's portrait (top left), and they
   are blue dots on the map (you are the purple one).
-- Monsters get tougher with more players (+50% health per extra player).
-- Loot: everyone rolls their own drops. Items a player drops on purpose can be picked up by anyone.
+- Like Diablo 2, monsters get tougher with more players: +50% health and +6.25% damage for each
+  extra player. Kills give more XP, which is shared between the players near the kill by level
+  (players far below or above the monster's level get less).
+- Loot: everyone rolls their own drops, and monsters drop something more often when other players
+  are near the kill (about +25% per extra player for ordinary monsters). Items a player drops on
+  purpose can be picked up by anyone.
 - If your connection drops, the game reconnects by itself for up to a minute. If the host leaves,
   everyone else keeps playing on their own.
 - The developer console's cheat commands are disabled during co-op.

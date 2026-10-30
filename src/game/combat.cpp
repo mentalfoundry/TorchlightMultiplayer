@@ -7,6 +7,8 @@
 #include "log.h"
 #include "net/session.h"
 
+#include <cmath>
+
 namespace tlmp::game::combat {
 
 using net::Msg;
@@ -15,6 +17,10 @@ constexpr float kShareRadius = 50.0f; // kills within this distance of a player 
 constexpr unsigned kDetailedLogs = 20; // log the first hits of each kind in full
 
 static net::Session* g_session = nullptr;
+static net::PartyRules g_rules;
+static Share g_lastShare;
+static float g_lastDamageScale = 0.0f;
+static unsigned g_sharesGiven = 0;
 static engine::Unit* g_applyingTo = nullptr; // target of our own TakeDamage call (not re-routed)
 static bool g_granting = false;             // our own GiveExperience / GiveFame calls
 
@@ -245,6 +251,107 @@ void attach(net::Session* session)
   g_session = session;
 }
 
+void setRules(const net::PartyRules& rules)
+{
+  g_rules = rules;
+  TLMP_LOG("combat: monster damage +%.2f%% per extra player; XP %s%s", rules.damagePerPlayer * 100.0f,
+           rules.experience == net::ExperienceModel::Diablo2 ? "Diablo 2 style" : "in full to everyone nearby",
+           rules.experience == net::ExperienceModel::Diablo2 && rules.levelGap ? " with the level gap" : "");
+}
+
+Share lastShare()
+{
+  return g_lastShare;
+}
+
+float lastDamageScale()
+{
+  return g_lastDamageScale;
+}
+
+unsigned sharesGiven()
+{
+  return g_sharesGiven;
+}
+
+static int levelOf(const void* unit)
+{
+  return unit ? engine::field<int>(const_cast<void*>(unit), engine::kUnitLevel) : 0;
+}
+
+// Diablo 2's level gap: 100% of the share within 5 levels of the monster, 5% from 10 levels on,
+// linear between (6: 81%, 7: 62%, 8: 43%, 9: 24%).
+static float gapFactor(int gap)
+{
+  if (gap < 0)
+    gap = -gap;
+  if (gap <= 5)
+    return 1.0f;
+  if (gap >= 10)
+    return 0.05f;
+  return 1.0f - 0.19f * static_cast<float>(gap - 5);
+}
+
+int playersNear(engine::Unit* victim, int* levels)
+{
+  int n = 1;
+  int sum = levelOf(reinterpret_cast<void*>(localPlayer()));
+  Vec3 at = unitPosition(victim);
+  for (uint8_t slot = 0; victim && slot < net::kMaxPlayers; slot++)
+  {
+    engine::Unit* other = avatarOf(slot);
+    if (!other || distXZ(unitPosition(other), at) > kShareRadius)
+      continue;
+    n++;
+    sum += levelOf(other);
+  }
+  if (levels)
+    *levels = sum;
+  return n;
+}
+
+// The local player's XP for a kill worth `amount` (PartyRules). Near: this player, and every other
+// player whose character is on this floor within kShareRadius of the victim.
+static int localShare(engine::Unit* victim, int amount)
+{
+  uintptr_t me = localPlayer();
+  if (!connected() || !me || !victim || amount <= 0 || g_rules.experience != net::ExperienceModel::Diablo2)
+    return amount;
+  int myLevel = levelOf(reinterpret_cast<void*>(me));
+  int levels = 0;
+  int nearby = playersNear(victim, &levels);
+  float total = static_cast<float>(amount) * monsters::healthScale() * (nearby > 1 ? 1.35f : 1.0f);
+  float part = levels > 0 ? static_cast<float>(myLevel) / static_cast<float>(levels) : 1.0f / nearby;
+  float gap = g_rules.levelGap ? gapFactor(myLevel - levelOf(victim)) : 1.0f;
+  int given = static_cast<int>(std::lround(total * part * gap));
+  if (given < 1)
+    given = 1;
+  g_lastShare = Share{amount, given, floor::playersInGame(), nearby, gap, true};
+  g_sharesGiven++;
+  static unsigned logged = 0;
+  if (++logged <= kDetailedLogs)
+    TLMP_LOG("combat: kill worth %d XP -> %d for me (%d in the game x%.2f, %d nearby%s, my level %d of %d, monster level %d: %.0f%%)",
+             amount, given, floor::playersInGame(), monsters::healthScale(), nearby, nearby > 1 ? " +35%" : "", myLevel,
+             levels, levelOf(victim), gap * 100.0f);
+  return given;
+}
+
+// Diablo 2: monsters hit harder for every player in the game beyond the first.
+static void scaleMonsterHit(engine::Unit* target, Hit& hit)
+{
+  if (g_rules.damagePerPlayer <= 0.0f || !hit.attacker || !monsters::isHostile(hit.attacker) ||
+      monsters::isHostile(target))
+    return;
+  int extra = floor::playersInGame() - 1;
+  if (extra <= 0)
+    return;
+  float scale = 1.0f + g_rules.damagePerPlayer * static_cast<float>(extra);
+  if (g_lastDamageScale == 0.0f)
+    TLMP_LOG("combat: monster hits x%.4f (%d players in the game)", scale, extra + 1);
+  g_lastDamageScale = scale;
+  hit.damage *= scale;
+}
+
 void tick()
 {
   static float next = 0.0f;
@@ -278,6 +385,8 @@ bool beforeTakeDamage(engine::Unit* target, Hit& hit)
     return true;
   if (floor::ownsCurrentLevel())
   {
+    // Monsters run here: their hits are scaled here, once (forwarded ones go out scaled).
+    scaleMonsterHit(target, hit);
     // A stand-in's own skills (and its summons) are for show: the real player's hits come from
     // their machine (onMonsterDamage applies those, and they pass above).
     if (skills::isShowOnly(hit.attacker))
@@ -296,10 +405,14 @@ bool beforeTakeDamage(engine::Unit* target, Hit& hit)
   return true;
 }
 
-bool allowReward(engine::Unit* unit, engine::Level* level, engine::Unit* victim, int amount, char raw, bool fame)
+bool allowReward(engine::Unit* unit, engine::Level* level, engine::Unit* victim, int& amount, char raw, bool fame)
 {
   if (!connected() || g_granting)
     return true;
+  // The local player's own kill (or its pet's or minions', forwarded to it), on the floor it runs.
+  if (!fame && !raw && reinterpret_cast<uintptr_t>(unit) == localPlayer() && floor::ownsCurrentLevel() &&
+      victim && monsters::isHostile(victim))
+    amount = localShare(victim, amount);
   if (!floor::ownsCurrentLevel())
   {
     // Rewards for the owner's monsters come only from onHostKill.
@@ -312,13 +425,14 @@ bool allowReward(engine::Unit* unit, engine::Level* level, engine::Unit* victim,
   uintptr_t me = localPlayer();
   if (me && victim && distXZ(unitPosition(reinterpret_cast<engine::Unit*>(me)), unitPosition(victim)) <= kShareRadius)
   {
+    int share = fame || raw ? amount : localShare(victim, amount);
     g_granting = true;
-    (fame ? engine::GiveFame : engine::GiveExperience)(reinterpret_cast<engine::Unit*>(me), level, victim, amount, raw);
+    (fame ? engine::GiveFame : engine::GiveExperience)(reinterpret_cast<engine::Unit*>(me), level, victim, share, raw);
     g_granting = false;
     if (!fame)
     {
       g_count.kills++;
-      TLMP_LOG("combat: [host] a remote player's kill gave me %d XP", amount);
+      TLMP_LOG("combat: [host] a remote player's kill gave me %d XP", share);
     }
   }
   return false;
@@ -338,6 +452,8 @@ bool onHostKill(engine::Unit* puppet)
     TLMP_LOG("combat: [client] kill %.0f away: too far for a share (%d XP)", distance, xp);
     return false;
   }
+  if (xp)
+    xp = localShare(puppet, xp);
   g_granting = true;
   if (xp)
     engine::GiveExperience(reinterpret_cast<engine::Unit*>(me), level, puppet, xp, 0);
