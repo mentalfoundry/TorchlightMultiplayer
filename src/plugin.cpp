@@ -374,23 +374,23 @@ static std::string sessionStatus()
     int players = g_session.playerCount();
     std::snprintf(b, sizeof(b), "Hosting, %d player%s.", players, players == 1 ? "" : "s");
     std::string line = b;
-    // First line: the join code (the easy way; it needs nothing from either router).
+    // Then, a line each: the join code (the easy way; it needs nothing from either router)...
     switch (net::tailcat::state())
     {
     case net::tailcat::State::Ready:
-      line += " Send friends the join code: they paste it into Join Co-op. No router setup needed.";
+      line += "\nSend friends the join code: they paste it into Join Co-op. No router setup needed.";
       break;
     case net::tailcat::State::Starting:
-      line += " Getting a join code...";
+      line += "\nGetting a join code...";
       break;
     case net::tailcat::State::Failed:
-      line += " " + codeStatus() + ", but friends can still join by IP.";
+      line += "\n" + codeStatus() + ", but friends can still join by IP.";
       break;
     default:
       break;
     }
-    // Second line: joining by IP instead.
-    line += "\nOr join by IP: ";
+    // ...and joining by IP instead.
+    line += net::tailcat::state() == net::tailcat::State::Off ? "\nFriends join by IP: " : "\nOr join by IP: ";
     if (!lan.empty())
       line += lan + ":" + port + " on your network. ";
     if (pub.empty())
