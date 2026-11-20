@@ -5,7 +5,7 @@ tailcat on
 wait 4
 clickslow TLMP_HostButton timeout=60
 expect tailcat ready timeout=60
-expect windowtext TLMP_JoinCode Join code ready: copy it for your friends timeout=10
+expect windowtext TLMP_JoinAt Friends join with your code timeout=10
 savecode timeout=10
 players 2 timeout=120
 savecode clear

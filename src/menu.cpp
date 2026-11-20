@@ -5,6 +5,8 @@
 
 #include <windows.h>
 
+#include <cstdio>
+
 #include <cstring>
 
 namespace tlmp::menu {
@@ -25,7 +27,6 @@ constexpr const char* kJoin = "TLMP_JoinButton";
 constexpr const char* kStatus = "TLMP_Status";
 constexpr const char* kJoinAt = "TLMP_JoinAt";
 constexpr const char* kCopy = "TLMP_CopyAddress";
-constexpr const char* kCode = "TLMP_JoinCode";
 constexpr const char* kCopyCode = "TLMP_CopyCode";
 constexpr const char* kAddress = "TLMP_Address";
 constexpr const char* kAddressBack = "TLMP_AddressBack";
@@ -40,25 +41,18 @@ static void build(void* parent)
   // On the Continue button's row, in the two free spots to its left.
   make(parent, "GuiLook/StandardButton", kHost, "{{.5,-507},{1,-140}}", "{{0,246},{0,44}}", "Host Co-op");
   make(parent, "GuiLook/StandardButton", kJoin, "{{.5,-251},{1,-140}}", "{{0,246},{0,44}}", "Join Co-op");
-  // Hosting: the address friends join at, big enough to read out.
+  // Hosting: how friends join -- one line, big enough to read out, with Copy code and Copy IP right
+  // after its text (placed when the text changes).
   if (void* s = make(parent, "GuiLook/StaticText", kJoinAt, "{{.5,-497},{1,-238}}", "{{0,740},{0,40}}", ""))
   {
     prop(s, "Font", "SerifBig");
     prop(s, "TextColour", "FFFFC84A");
     prop(s, "MousePassThroughEnabled", "True");
   }
-  // Next to it: copies the address for pasting to friends.
-  if (void* b = make(parent, "GuiLook/StandardButton", kCopy, "{{.5,-150},{1,-242}}", "{{0,120},{0,40}}", "Copy IP"))
-    api.setVisible(b, false);
-  // Above it: the join code (too long to read out: copied and pasted).
-  if (void* s = make(parent, "GuiLook/StaticText", kCode, "{{.5,-497},{1,-286}}", "{{0,740},{0,40}}", ""))
-  {
-    prop(s, "Font", "SerifBig");
-    prop(s, "TextColour", "FFFFC84A");
-    prop(s, "MousePassThroughEnabled", "True");
-  }
-  if (void* b = make(parent, "GuiLook/StandardButton", kCopyCode, "{{.5,-150},{1,-290}}", "{{0,120},{0,40}}",
+  if (void* b = make(parent, "GuiLook/StandardButton", kCopyCode, "{{.5,-150},{1,-242}}", "{{0,120},{0,40}}",
                      "Copy code"))
+    api.setVisible(b, false);
+  if (void* b = make(parent, "GuiLook/StandardButton", kCopy, "{{.5,-20},{1,-242}}", "{{0,120},{0,40}}", "Copy IP"))
     api.setVisible(b, false);
   if (void* s = make(parent, "GuiLook/StaticText", kStatus, "{{.5,-497},{1,-196}}", "{{0,740},{0,52}}", ""))
   {
@@ -231,66 +225,76 @@ void tick()
       text(s, now);
     }
   }
+  // Inviting friends: "Friends join with your code or at <IP>", then Copy code and Copy IP side by
+  // side. (While the code is being made, or if there is none, the status line below says so.)
   std::string address = g_actions.joinAddress ? g_actions.joinAddress() : "";
+  std::string code = g_actions.joinCode ? g_actions.joinCode() : "";
+  bool showCode = !code.empty() && !g_joining;
+  bool showIp = !address.empty() && !g_joining;
+  void* copyCode = windowNamed(kCopyCode);
+  void* copyIp = windowNamed(kCopy);
   if (void* s = windowNamed(kJoinAt))
   {
     static std::string last;
-    std::string now = address.empty() || g_joining ? "" : "Friends join at " + address;
+    std::string now = showCode && showIp ? "Friends join with your code or at " + address
+                      : showCode         ? std::string("Friends join with your code")
+                      : showIp           ? "Friends join at " + address
+                                         : std::string();
     if (now != last)
     {
       last = now;
       text(s, now);
+      // The buttons right after the text (its width in this font, at this screen size).
+      float width = static_cast<float>(now.size()) * 9.5f;
+      if (void* font = api.font ? api.font(s, true) : nullptr; font && api.textExtent && !now.empty())
+      {
+        Str t(now);
+        width = api.textExtent(font, t.p(), 1.0f);
+      }
+      int x = -497 + static_cast<int>(width) + 16;
+      char pos[64];
+      for (void* button : {showCode ? copyCode : nullptr, showIp ? copyIp : nullptr})
+      {
+        if (!button)
+          continue;
+        std::snprintf(pos, sizeof(pos), "{{.5,%d},{1,-242}}", x);
+        prop(button, "UnifiedPosition", pos);
+        x += 128;
+      }
     }
   }
-  static bool copyDown = false;
-  static DWORD copiedUntil = 0;
-  if (void* copy = windowNamed(kCopy))
+  static bool copyDown = false, copyCodeDown = false;
+  static DWORD copiedUntil = 0, codeCopiedUntil = 0;
+  if (copyIp)
   {
-    bool show = !address.empty() && !g_joining;
-    if (api.visible(copy, false) != show)
-      api.setVisible(copy, show);
-    if (clicked(copy, copyDown) && copyToClipboard(address))
+    if (api.visible(copyIp, false) != showIp)
+      api.setVisible(copyIp, showIp);
+    if (clicked(copyIp, copyDown) && copyToClipboard(address))
     {
-      text(copy, "Copied!");
+      text(copyIp, "Copied!");
       copiedUntil = GetTickCount() + 2000;
       TLMP_LOG("menu: copied the join address to the clipboard");
     }
     if (copiedUntil && GetTickCount() >= copiedUntil)
     {
       copiedUntil = 0;
-      text(copy, "Copy IP");
+      text(copyIp, "Copy IP");
     }
   }
-  // The join code: its state, and Copy once there is one.
-  std::string code = g_actions.joinCode ? g_actions.joinCode() : "";
-  if (void* s = windowNamed(kCode))
+  if (copyCode)
   {
-    static std::string last;
-    std::string state = g_actions.codeStatus ? g_actions.codeStatus() : "";
-    std::string now = g_joining ? "" : state == "Join code ready" ? "Join code ready: copy it for your friends" : state;
-    if (now != last)
+    if (api.visible(copyCode, false) != showCode)
+      api.setVisible(copyCode, showCode);
+    if (clicked(copyCode, copyCodeDown) && copyToClipboard(code))
     {
-      last = now;
-      text(s, now);
-    }
-  }
-  static bool copyCodeDown = false;
-  static DWORD codeCopiedUntil = 0;
-  if (void* copy = windowNamed(kCopyCode))
-  {
-    bool show = !code.empty() && !g_joining;
-    if (api.visible(copy, false) != show)
-      api.setVisible(copy, show);
-    if (clicked(copy, copyCodeDown) && copyToClipboard(code))
-    {
-      text(copy, "Copied!");
+      text(copyCode, "Copied!");
       codeCopiedUntil = GetTickCount() + 2000;
       TLMP_LOG("menu: copied the join code to the clipboard");
     }
     if (codeCopiedUntil && GetTickCount() >= codeCopiedUntil)
     {
       codeCopiedUntil = 0;
-      text(copy, "Copy code");
+      text(copyCode, "Copy code");
     }
   }
   if (!g_joining)

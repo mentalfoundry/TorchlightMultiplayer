@@ -373,6 +373,8 @@ static std::string sessionStatus()
     net::upnp::Status u = net::upnp::status();
     std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s).", g_session.playerCount());
     std::string line = b;
+    if (net::tailcat::state() != net::tailcat::State::Ready && !codeStatus().empty())
+      line += " " + codeStatus() + (net::tailcat::state() == net::tailcat::State::Failed ? "." : "");
     if (pub.empty())
       line += " Finding your internet address...";
     if (!lan.empty())
@@ -380,7 +382,7 @@ static std::string sessionStatus()
     if (u.state == net::upnp::State::Working)
       line += " Opening the port on your router...";
     else if (u.state != net::upnp::State::Open && !pub.empty())
-      line += " If friends can't connect, forward UDP " + port + " to this PC on your router.";
+      line += " If friends can't connect by IP, forward UDP " + port + " to this PC on your router.";
     return line;
   }
   if (g_session.isReconnecting())
@@ -507,7 +509,6 @@ static void start()
       return pub.empty() ? pub : pub + ":" + std::to_string(g_config.port);
     },
     [] { return g_session.isHost() ? net::tailcat::code() : std::string(); },
-    [] { return codeStatus(); },
   });
 }
 
