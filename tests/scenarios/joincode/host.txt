@@ -1,0 +1,17 @@
+# Join codes: the host clicks Host Co-op and gets a join code (Tailscale's Tailcat); the client pastes
+# it into Join Co-op and plays through it. This scenario reaches Tailscale's public relay servers
+# (other test runs don't: join codes are off in tests unless turned on).
+tailcat on
+wait 4
+clickslow TLMP_HostButton timeout=60
+expect tailcat ready timeout=60
+expect windowtext TLMP_JoinCode Join code ready: copy it for your friends timeout=10
+savecode timeout=10
+players 2 timeout=120
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=120
+expect avatar 1 timeout=60
+expect samelevel 1 timeout=60
+sync end timeout=60
+quit

@@ -19,6 +19,7 @@
 #include "game/triggers.h"
 #include "log.h"
 #include "net/session.h"
+#include "net/tailcat.h"
 #include "net/upnp.h"
 
 #include <windows.h>
@@ -1002,6 +1003,15 @@ Poll expectCheck(const Step& s, std::string& why)
           std::to_string(b.before * 100.0f) + "% -> " + std::to_string(b.after * 100.0f) + "%";
     return b.count > g_bonusMark && b.nearby == intArg(s, 2) && b.after > b.before ? Poll::Done : Poll::Wait;
   }
+  if (what == "tailcat" && s.args.size() > 2) // tailcat ready|failed|off: the join code connection's state
+  {
+    net::tailcat::State st = net::tailcat::state();
+    const char* names[] = {"off", "starting", "ready", "failed"};
+    why = names[static_cast<int>(st)];
+    if (st == net::tailcat::State::Failed)
+      why += ": " + net::tailcat::error();
+    return s.args[2] == names[static_cast<int>(st)] ? Poll::Done : Poll::Wait;
+  }
   if (what == "damagescale" && s.args.size() > 2) // damagescale <x>: the last monster hit run here was scaled by x
   {
     float want = floatArg(s, 2, 1.0f), got = combat::lastDamageScale();
@@ -1498,6 +1508,37 @@ Poll run(const Step& s, bool begin, std::string& why)
     char b[64];
     std::snprintf(b, sizeof(b), "to (%.1f, %.1f)", x, z);
     why = b;
+    return Poll::Done;
+  }
+  if (cmd == "tailcat" && s.args.size() > 1)
+  {
+    // Test only: join codes on for this run (they reach Tailscale's public relays).
+    net::tailcat::setEnabled(s.args[1] == "on");
+    return Poll::Done;
+  }
+  if (cmd == "savecode" || cmd == "usecode")
+  {
+    // Test only: the host hands its join code to the other test instances through a file under
+    // tlmp_test (the code is a secret: the client deletes the file once it has it).
+    std::wstring dir = g_outDir.substr(0, g_outDir.find_last_of(L'\\'));
+    std::wstring file = dir + L"\\joincode.txt";
+    if (cmd == "savecode")
+    {
+      std::string code = net::tailcat::code();
+      if (code.empty())
+        return Poll::Wait;
+      std::ofstream(file) << code;
+      why = "code saved";
+      return Poll::Done;
+    }
+    std::string code;
+    std::getline(std::ifstream(file), code);
+    void* box = cegui::windowNamed("TLMP_Address");
+    if (code.empty() || !box)
+      return Poll::Wait;
+    cegui::text(box, code);
+    DeleteFileW(file.c_str());
+    why = "code in the join box";
     return Poll::Done;
   }
   if (cmd == "netdrop" && s.args.size() > 1)

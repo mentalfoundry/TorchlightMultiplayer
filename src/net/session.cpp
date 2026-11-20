@@ -52,6 +52,16 @@ void Session::dropIncomingFor(float seconds)
   TLMP_LOG("net: [test] receiving nothing for %.0f s", seconds);
 }
 
+// Join codes carry datagrams of at most 1232 bytes (net/tailcat.h); ENet's default is 1400. Every
+// session uses 1200 so a connection works the same by code or by IP. A peer's MTU is the host's at
+// reset (and the smaller of both ends' once connected).
+static void limitMtu(ENetHost* host)
+{
+  host->mtu = 1200;
+  for (size_t i = 0; i < host->peerCount; i++)
+    host->peers[i].mtu = 1200;
+}
+
 uint32_t gameBuildStamp()
 {
   auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
@@ -86,6 +96,7 @@ bool Session::start(const Config& cfg, Callbacks callbacks)
       TLMP_LOG("net: failed to listen on port %u", cfg.port);
       return false;
     }
+    limitMtu(m_host);
     m_slotTokens = {};
     m_localSlot = 0;
     m_players[0].active = true;
@@ -100,6 +111,7 @@ bool Session::start(const Config& cfg, Callbacks callbacks)
       TLMP_LOG("net: failed to create client host");
       return false;
     }
+    limitMtu(m_host);
     ENetAddress addr{};
     if (enet_address_set_host(&addr, cfg.address.c_str()) != 0)
     {

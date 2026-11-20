@@ -17,6 +17,8 @@ struct Actions
   bool (*inSession)();                     // hosting, connected or connecting
   std::string (*lastAddress)();            // to fill the address box with
   std::string (*joinAddress)();            // host: "IP:port" friends join at ("" while unknown / not hosting)
+  std::string (*joinCode)();               // host: the join code (net/tailcat.h; "" until ready). A secret.
+  std::string (*codeStatus)();             // host: "Getting a join code...", "Join code ready" ... ("" if off)
 };
 
 void init(const Actions& actions);

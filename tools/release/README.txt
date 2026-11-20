@@ -19,16 +19,20 @@ INSTALL
 
 HOST A GAME
 1. Start Torchlight and click "Host Co-op" on the title screen.
-2. The screen shows "Friends join at <address>". Click "Copy" and send that address to your friends.
+2. After a moment the screen says "Join code ready". Click "Copy code" and send the code to your
+   friends (it is long: paste it into Discord, a chat or an email). Anyone with the code can join,
+   so only share it with friends. It changes every time you host.
 3. Click "Continue" to load your character. Friends can join before or after you do.
 - If Windows asks whether Torchlight may use the network, click Allow.
-- The game asks your router to open UDP port 27960 by itself (UPnP). If friends can't connect and
-  the title screen says so, forward UDP port 27960 to your PC in your router's settings. Playing
-  over a VPN such as Tailscale or ZeroTier also works: give friends your VPN address instead.
+- Join codes need no router settings: the games find each other through Tailscale's free relay
+  servers and connect directly when they can.
+- The alternative, by address: the screen also shows "Friends join at <address>" ("Copy IP"). For
+  that, the game asks your router to open UDP port 27960 (UPnP); if it can't, forward UDP port
+  27960 to your PC in your router's settings. A VPN such as Tailscale or ZeroTier also works.
 
 JOIN A GAME
-1. Start Torchlight, click "Join Co-op", paste the host's address (Ctrl+V or the Paste button) and
-   click "Connect".
+1. Start Torchlight, click "Join Co-op", paste the host's join code (Ctrl+V or the Paste button)
+   -- or their address -- and click "Connect".
 2. Click "Continue" to load your own character. You are taken to the host's floor.
 
 PLAYING TOGETHER
@@ -54,6 +58,10 @@ PROBLEMS
 - "The host turned the connection down": the game is full (4 players), or you don't all have the
   same TLMP build.
 - Settings (port, monster health per player, ...) are in TLMP.ini in your Torchlight folder.
+
+THIRD-PARTY
+libtailcat.dll is Tailcat by Tailscale Inc. (BSD-3-Clause, see LICENSE.tailcat.txt), with one change:
+it reads the Windows version in a way that works inside Torchlight.
 
 UNINSTALL
 Close Torchlight and double-click Uninstall.bat. The game's own files are put back. Your saves are

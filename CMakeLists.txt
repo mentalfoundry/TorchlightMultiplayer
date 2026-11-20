@@ -53,6 +53,7 @@ add_library(TLMP SHARED
   src/game/levelguard.cpp
   src/game/minimap.cpp
   src/net/upnp.cpp
+  src/net/tailcat.cpp
   src/menu.cpp
   src/cegui.cpp
   src/chat.cpp

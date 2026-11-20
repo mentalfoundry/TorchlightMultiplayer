@@ -25,6 +25,13 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 
 Copy-Item (Join-Path $bin 'TLMP.dll'), (Join-Path $bin 'OgreGUIRenderer.dll') $stage
+# Join codes: libtailcat.dll (tools\tailcat\build.ps1) and its licence (BSD-3-Clause).
+$tailcat = Join-Path $root 'build\tailcat'
+if (Test-Path (Join-Path $tailcat 'libtailcat.dll')) {
+  Copy-Item (Join-Path $tailcat 'libtailcat.dll'), (Join-Path $tailcat 'LICENSE.tailcat.txt') $stage
+} else {
+  Write-Warning 'No build\tailcat\libtailcat.dll (run tools\tailcat\build.ps1): the package has no join codes'
+}
 Copy-Item (Join-Path $root 'TLMP.ini') $stage
 foreach ($f in 'setup.ps1', 'Install.bat', 'Uninstall.bat') {
   Copy-Item (Join-Path $PSScriptRoot "release\$f") $stage

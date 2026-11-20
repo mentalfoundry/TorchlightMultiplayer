@@ -20,6 +20,7 @@
 #include "game/triggers.h"
 #include "log.h"
 #include "net/session.h"
+#include "net/tailcat.h"
 #include "net/upnp.h"
 #include "menu.h"
 #include "chat.h"
@@ -43,6 +44,7 @@ constexpr float kStateSendInterval = 1.0f / 20.0f;
 static void upnpReport();
 
 static void hudTick();
+static void codeJoinTick();
 
 class NetFrameListener final : public ogre_abi::FrameListener
 {
@@ -53,6 +55,7 @@ public:
     game::setHostRole(g_session.isHost() && g_session.isConnected());
     game::tick(evt.timeSinceLastFrame);
     upnpReport();
+    codeJoinTick();
     menu::tick();
     chat::tick();
     hudTick();
@@ -229,10 +232,47 @@ static void applyPartyRules(const net::PartyRules& rules)
 }
 
 // Starts hosting, or joining "host[:port]". False if a session is already running or it failed.
+// A join by code waiting for Tailcat to reach the host (net/tailcat.h); the ENet session starts
+// once it has (codeJoinTick).
+static bool g_codeJoinPending = false;
+
+static bool beginSession(NetMode mode, const std::string& address);
+
+static void codeJoinTick()
+{
+  if (!g_codeJoinPending)
+    return;
+  net::tailcat::State s = net::tailcat::state();
+  if (s == net::tailcat::State::Ready)
+  {
+    g_codeJoinPending = false;
+    beginSession(NetMode::Client, "127.0.0.1:" + std::to_string(net::tailcat::localPort()));
+    g_config.address = ""; // never show (or keep) the relay port as the host's address
+  }
+  else if (s != net::tailcat::State::Starting)
+  {
+    g_codeJoinPending = false;
+    std::string why = net::tailcat::error();
+    TLMP_LOG("session: joining by code failed: %s", why.c_str());
+    game::showMessage("Could not join with that code: " + why, 8.0f);
+    net::tailcat::stop();
+  }
+}
+
 static bool beginSession(NetMode mode, const std::string& address)
 {
-  if (g_session.isActive())
+  if (g_session.isActive() || g_codeJoinPending)
     return false;
+  if (mode == NetMode::Client && net::tailcat::looksLikeCode(address))
+  {
+    // The code is a secret: not logged, not kept in TLMP.ini, not shown.
+    TLMP_LOG("session: joining with a join code");
+    net::tailcat::startClient(address);
+    g_codeJoinPending = net::tailcat::state() == net::tailcat::State::Starting;
+    if (!g_codeJoinPending)
+      game::showMessage("Could not join with that code: " + net::tailcat::error(), 8.0f);
+    return g_codeJoinPending;
+  }
   Config c = g_config;
   c.mode = mode;
   c.playerName = sessionName();
@@ -261,12 +301,29 @@ static bool beginSession(NetMode mode, const std::string& address)
     net::upnp::open(c.port);
   if (mode == NetMode::Host && c.testScript.empty())
     net::upnp::lookupPublicAddress();
+  if (mode == NetMode::Host && net::tailcat::enabled())
+    net::tailcat::startHost(c.port);
   return true;
+}
+
+// The session's goodbye to the others goes out through the join code's relay (a background thread):
+// give it a moment before Tailcat closes, or they would take the end for a dropped connection.
+static void stopTailcatAfterGoodbye()
+{
+  if (net::tailcat::state() == net::tailcat::State::Off)
+    return;
+  Sleep(300);
+  net::tailcat::stop();
 }
 
 // Ends the session from this side (the others see us leave); this game goes on alone.
 static void leaveSession(const char* why)
 {
+  if (g_codeJoinPending)
+  {
+    g_codeJoinPending = false;
+    net::tailcat::stop();
+  }
   if (!g_session.isActive())
     return;
   TLMP_LOG("session: ending (%s)", why);
@@ -276,11 +333,34 @@ static void leaveSession(const char* why)
   game::floor::endSession();
   g_session.stop();
   net::upnp::close();
+  stopTailcatAfterGoodbye();
   g_config.mode = NetMode::Off;
+}
+
+// The host's join code, for the title screen's status ("" when join codes are off).
+static std::string codeStatus()
+{
+  if (!g_session.isHost())
+    return "";
+  switch (net::tailcat::state())
+  {
+  case net::tailcat::State::Starting: return "Getting a join code...";
+  case net::tailcat::State::Ready: return "Join code ready";
+  case net::tailcat::State::Failed: return "No join code (" + net::tailcat::error() + ")";
+  default: return "";
+  }
+}
+
+// Who a client joined: the address typed, or "the host" when it joined with a code.
+static std::string hostLabel()
+{
+  return g_config.address.empty() ? std::string("the host") : g_config.address;
 }
 
 static std::string sessionStatus()
 {
+  if (g_codeJoinPending)
+    return "Co-op: connecting with the join code...";
   char b[160];
   if (!g_session.isActive())
     return "Co-op: not in a session (TLMP " TLMP_VERSION ")";
@@ -304,10 +384,10 @@ static std::string sessionStatus()
     return line;
   }
   if (g_session.isReconnecting())
-    return "Co-op: lost the connection; reconnecting to " + g_config.address + "...";
+    return "Co-op: lost the connection; reconnecting to " + hostLabel() + "...";
   if (!g_session.isConnected())
-    return "Co-op: connecting to " + g_config.address + "...";
-  std::snprintf(b, sizeof(b), "Co-op: joined %s, %d player(s)", g_config.address.c_str(), g_session.playerCount());
+    return "Co-op: connecting to " + hostLabel() + "...";
+  std::snprintf(b, sizeof(b), "Co-op: joined %s, %d player(s)", hostLabel().c_str(), g_session.playerCount());
   return b;
 }
 
@@ -354,6 +434,7 @@ static void start()
   cb.onPlayerInfo = [](uint8_t slot, const net::PlayerInfo& info) { game::onRemoteInfo(slot, info); };
   cb.onWorldSeed = [](uint32_t seed) { game::onHostWorldSeed(seed); };
   cb.onHostLost = [](net::HostLost why) {
+    net::tailcat::stop(); // a client that joined with a code: its connection goes with the session
     // The session is over: this game goes on alone. What the floor shows becomes its own (copies
     // get their AI back once we're no client), others' dropped items leave, settings are ours again.
     game::endSession();
@@ -407,21 +488,26 @@ static void start()
   // buttons do (menu.cpp).
   if (g_config.mode != NetMode::Off)
     beginSession(g_config.mode, g_config.address);
+  // Join codes reach Tailscale's public relays: test runs use them only when a scenario says so.
+  net::tailcat::setEnabled(g_config.tailcat && g_config.testScript.empty());
   game::autotest::start(&g_session, g_config.testScript);
   menu::init(menu::Actions{
     [] { return beginSession(NetMode::Host, ""); },
     [](const std::string& address) {
-      WritePrivateProfileStringA("net", "address", address.c_str(), ".\\TLMP.ini"); // offered next time
+      if (!net::tailcat::looksLikeCode(address)) // a code is a secret, and new for every hosting anyway
+        WritePrivateProfileStringA("net", "address", address.c_str(), ".\\TLMP.ini"); // offered next time
       return beginSession(NetMode::Client, address);
     },
     [] { leaveSession("left from the title screen"); },
     [] { return sessionStatus(); },
-    [] { return g_session.isActive(); },
+    [] { return g_session.isActive() || g_codeJoinPending; },
     [] { return g_config.address; },
     [] {
       std::string pub = g_session.isHost() ? net::upnp::publicAddress() : "";
       return pub.empty() ? pub : pub + ":" + std::to_string(g_config.port);
     },
+    [] { return g_session.isHost() ? net::tailcat::code() : std::string(); },
+    [] { return codeStatus(); },
   });
 }
 
@@ -514,6 +600,7 @@ static void stop()
   game::loot::endSession(); // other players' dropped items leave the ground
   game::floor::endSession();
   g_session.stop();
+  stopTailcatAfterGoodbye();
   net::upnp::close();
   if (g_root && g_removeFrameListener)
     g_removeFrameListener(g_root, &g_frameListener);

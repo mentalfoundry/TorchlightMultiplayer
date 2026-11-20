@@ -20,6 +20,8 @@ struct Config
   std::string address = "127.0.0.1"; // client: host to connect to
   uint16_t port = 27960;
   bool upnp = true;            // host: open the port on the router with UPnP ([net] upnp; off in test mode)
+  bool tailcat = true;         // host: also offer a join code ([net] tailcat; off in test mode unless a
+                               // scenario turns it on: it reaches Tailscale's public relays)
   std::string playerName = "Adventurer";
   net::PartyRules rules;       // host: monster scaling and XP per party size ([party])
   uint32_t devWorldSeed = 0; // -tlmp-worldseed N: act as if a host sent N (testing only)

@@ -37,6 +37,7 @@ $suite = [ordered]@{
   chat        = @()
   reconnect   = @()
   reconnectfail = @()
+  joincode    = @()  # reaches Tailscale's public relays
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

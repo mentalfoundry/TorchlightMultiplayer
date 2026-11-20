@@ -1,0 +1,15 @@
+# Join codes (see host.txt): Join Co-op, the code into the box, Connect.
+tailcat on
+wait 8
+clickslow TLMP_JoinButton timeout=60
+usecode timeout=120
+clickslow TLMP_Connect timeout=10
+expect tailcat ready timeout=60
+players 2 timeout=120
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=120
+expect avatar 0 timeout=60
+sync end timeout=60
+quit

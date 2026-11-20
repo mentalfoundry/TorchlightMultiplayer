@@ -306,3 +306,13 @@ Also: [0xF09048] CCameraControl, [0xE37968] CMasterResourceManager, [0xEFB888] C
   +0x8 (count +0xC), entry = { data*, target* }, weight at data+0x8. Target = CSpawnClassData: source
   text std::wstring at +0x8 ("UNITTYPE:NONE"), sub-table +0x50, +0x54 set for NONE. Weights go into a
   weighted bag (0x5BF910) and one entry is drawn; nested tables resolve through the same function.
+
+## Join codes: Tailcat in a 2009 game (2026-11-20)
+- libtailcat.dll (cmd/libtailcat, ABI 1) builds for windows/386 with LLVM-MinGW (i686, UCRT): 16 MB,
+  imports only kernel32 and the UCRT. tools/tailcat/build.ps1 pins the commit.
+- Patch needed: github.com/dblohm7/wingoes reads the version with GetVersionEx and panics when it isn't
+  10.0 ("incoherent Windows version -- missing/outdated manifest?"); Torchlight.exe has no Windows 10
+  manifest, so GetVersionEx says 6.2 and the first network call (tshttpproxy) took the process down.
+  The patched copy uses RtlGetNtVersionNumbers.
+- UDP datagrams over Tailcat are at most 1232 bytes: every session's ENet MTU is 1200.
+- One machine, two instances: host ready in ~1.7 s, client through in ~0.6 s, direct path.

@@ -51,6 +51,7 @@ Config loadConfig()
   cfg.address = buf;
   cfg.port = static_cast<uint16_t>(GetPrivateProfileIntA("net", "port", cfg.port, ini));
   cfg.upnp = GetPrivateProfileIntA("net", "upnp", 1, ini) != 0;
+  cfg.tailcat = GetPrivateProfileIntA("net", "tailcat", 1, ini) != 0;
   GetPrivateProfileStringA("player", "name", cfg.playerName.c_str(), buf, sizeof(buf), ini);
   cfg.playerName = buf;
   GetPrivateProfileStringA("party", "monster_health_per_player", "0.5", buf, sizeof(buf), ini);

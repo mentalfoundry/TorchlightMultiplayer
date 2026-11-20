@@ -107,7 +107,7 @@ if ($Uninstall) {
     Set-Content -Path $cfg -Value $lines -Encoding ascii
   }
   if ((Test-Path $orig) -and -not (Test-OurProxy $orig)) { Move-Item $orig $proxy -Force }
-  foreach ($f in 'TLMP.dll', 'TLMP.pdb', 'OgreGUIRenderer.pdb') {
+  foreach ($f in 'TLMP.dll', 'TLMP.pdb', 'OgreGUIRenderer.pdb', 'libtailcat.dll') {
     Remove-Item (Join-Path $GameDir $f) -ErrorAction SilentlyContinue
   }
   Write-Host ''
@@ -138,6 +138,8 @@ if (-not (Test-Path $orig)) {
 }
 Copy-Item (Join-Path $here 'OgreGUIRenderer.dll') $proxy -Force
 Copy-Item (Join-Path $here 'TLMP.dll') $GameDir -Force
+# Join codes (Tailscale's Tailcat); without it, hosting offers the IP route only.
+if (Test-Path (Join-Path $here 'libtailcat.dll')) { Copy-Item (Join-Path $here 'libtailcat.dll') $GameDir -Force }
 
 if (-not (Test-Path "$cfg.tlmp-backup")) { Copy-Item $cfg "$cfg.tlmp-backup" }
 if (-not (Get-Content $cfg | Where-Object { $_.Trim() -eq $line })) {

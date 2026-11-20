@@ -17,7 +17,7 @@ if ($Uninstall) {
   $lines = Get-Content $cfg | Where-Object { $_.Trim() -ne $line }
   Set-Content -Path $cfg -Value $lines -Encoding ascii
   if (Test-Path $orig) { Move-Item $orig $proxy -Force }
-  foreach ($f in 'TLMP.dll', 'TLMP.pdb', 'OgreGUIRenderer.pdb') {
+  foreach ($f in 'TLMP.dll', 'TLMP.pdb', 'OgreGUIRenderer.pdb', 'libtailcat.dll') {
     Remove-Item (Join-Path $GameDir $f) -ErrorAction SilentlyContinue
   }
   Write-Host 'TLMP removed (TLMP.ini, tlmp_profiles and logs left in place).'
@@ -30,6 +30,9 @@ $src = Join-Path $PSScriptRoot "build\$Config"
 if (-not (Test-Path $orig)) { Move-Item $proxy $orig }
 Copy-Item (Join-Path $src 'OgreGUIRenderer.dll') $proxy -Force
 Copy-Item (Join-Path $src 'TLMP.dll') $GameDir -Force
+# Join codes (tools\tailcat\build.ps1 makes it; without it hosting offers the IP route only).
+$tailcat = Join-Path $PSScriptRoot 'build\tailcat\libtailcat.dll'
+if (Test-Path $tailcat) { Copy-Item $tailcat $GameDir -Force } else { Write-Warning 'No build\tailcat\libtailcat.dll: no join codes' }
 foreach ($pdb in 'TLMP.pdb', 'OgreGUIRenderer.pdb') {
   if (Test-Path (Join-Path $src $pdb)) { Copy-Item (Join-Path $src $pdb) $GameDir -Force }
 }

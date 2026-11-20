@@ -22,18 +22,37 @@ go to `dist\symbols\<name>\` for reading crash logs from that build.
 .\install.ps1 -Uninstall    # restores Plugins.cfg and the original OgreGUIRenderer.dll
 ```
 
-Install does three things:
-- copies `TLMP.dll` into the game folder
+Join codes need `libtailcat.dll` (Tailscale's Tailcat, BSD-3-Clause), built separately -- only when
+Tailcat changes -- with Go and LLVM-MinGW (see the script's header):
+
+```powershell
+.\tools\tailcat\build.ps1     # -> build\tailcat\libtailcat.dll (32-bit, pinned commit, one patch)
+```
+
+Install does three things (four with join codes):
+- copies `TLMP.dll` (and `build\tailcat\libtailcat.dll` if built) into the game folder
 - swaps `OgreGUIRenderer.dll` for a forwarding proxy (the original is kept as `OgreGUIRenderer_orig.dll`)
 - adds `Plugin=TLMP` to `Plugins.cfg`
 
 ## Running
 
-On the title screen, **Host Co-op** starts a session; friends click **Join Co-op**, type or paste
-(Ctrl+V or the Paste button) the host's address (`IP` or `IP:port`) and **Connect**, then everyone clicks Continue. In a session the button
-reads **Leave Co-op**. The line above the buttons says what the session is doing.
+On the title screen, **Host Co-op** starts a session; friends click **Join Co-op**, paste (Ctrl+V or
+the Paste button) the host's join code -- or type its address (`IP` or `IP:port`) -- and **Connect**,
+then everyone clicks Continue. In a session the button reads **Leave Co-op**. The line above the
+buttons says what the session is doing.
 
-Playing over the internet: when you host, the title screen shows the address friends join at
+**Join codes** (the easy way): hosting shows "Join code ready" and a **Copy code** button within a couple
+of seconds. The code (about 230 characters, so copy and paste it) is a [Tailcat](https://github.com/tailscale/tailcat)
+address: the two games find each other through Tailscale's public relay servers, punch a direct
+connection through both routers when they can, and otherwise keep relaying -- WireGuard-encrypted, no
+accounts, no router settings. The code is new each time you host and lets anyone who has it join, so
+share it only with friends; TLMP never logs it. ENet itself is unchanged: on the host, Tailcat hands
+each friend's packets to the session's port; on a friend's PC a local relay port carries them (all
+sessions use a 1200-byte ENet packet size to fit Tailcat's 1232). `[net] tailcat=0` turns codes off.
+
+**By address** (the alternative, e.g. should the public relays ever go away):
+
+when you host, the title screen shows the address friends join at
 (your public IP and port, from the router or, failing that, one lookup at api.ipify.org) and the
 address for friends on your own network. The game also asks your router to open UDP port 27960
 (UPnP). If your router doesn't do UPnP, it tells you so:
@@ -152,5 +171,6 @@ open and close while tests run; avoid typing during a run (the game reads some k
 | Reconnecting after a dropped connection (old slot back, party floor) | done, rig-tested |
 | Party frames (name, level, health, where); other players on the minimap | done, rig-tested |
 | Internet play: UPnP port opening, manual forwarding fallback | built; not tested on a UPnP router or over the internet |
+| Join codes (Tailscale's Tailcat: NAT traversal, public relays, no accounts) | done, rig-tested on one PC; not yet over the internet |
 
 Reverse-engineering notes and tools are in [re/](re/) (`NOTES.md` has every verified address).
