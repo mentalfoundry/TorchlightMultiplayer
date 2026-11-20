@@ -38,6 +38,7 @@ $suite = [ordered]@{
   reconnect   = @()
   reconnectfail = @()
   joincode    = @()  # reaches Tailscale's public relays
+  joincode4   = @()  # 4 players by one code (public relays)
 }
 $summary = @()
 foreach ($name in $suite.Keys) {

@@ -1,0 +1,17 @@
+# Four players by join code (see host.txt): friend 1.
+tailcat on
+wait 12
+clickslow TLMP_JoinButton timeout=60
+usecode timeout=120
+clickslow TLMP_Connect timeout=10
+expect tailcat ready timeout=60
+players 4 timeout=180
+click ContinueLast timeout=90
+ingame timeout=90
+expect samelevel 0 timeout=90
+sync ingame timeout=240
+expect avatar 0 timeout=60
+expect avatar 2 timeout=60
+expect avatar 3 timeout=60
+sync end timeout=60
+quit

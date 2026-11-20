@@ -1,0 +1,20 @@
+# Four players by join code: the host's code is used by three friends at once; each gets its own
+# Tailcat flow into the session. (Reaches Tailscale's public relays.)
+tailcat on
+wait 4
+clickslow TLMP_HostButton timeout=60
+expect tailcat ready timeout=60
+savecode timeout=10
+players 4 timeout=180
+savecode clear
+click ContinueLast timeout=90
+ingame timeout=90
+sync ingame timeout=240
+expect avatar 1 timeout=60
+expect avatar 2 timeout=60
+expect avatar 3 timeout=60
+expect samelevel 1 timeout=60
+expect samelevel 2 timeout=60
+expect samelevel 3 timeout=60
+sync end timeout=60
+quit

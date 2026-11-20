@@ -8,6 +8,7 @@ expect tailcat ready timeout=60
 expect windowtext TLMP_JoinCode Join code ready: copy it for your friends timeout=10
 savecode timeout=10
 players 2 timeout=120
+savecode clear
 click ContinueLast timeout=90
 ingame timeout=90
 sync ingame timeout=120

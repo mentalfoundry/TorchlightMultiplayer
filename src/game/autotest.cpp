@@ -1519,9 +1519,14 @@ Poll run(const Step& s, bool begin, std::string& why)
   if (cmd == "savecode" || cmd == "usecode")
   {
     // Test only: the host hands its join code to the other test instances through a file under
-    // tlmp_test (the code is a secret: the client deletes the file once it has it).
+    // tlmp_test (the code is a secret: "savecode clear" deletes the file once everyone has it).
     std::wstring dir = g_outDir.substr(0, g_outDir.find_last_of(L'\\'));
     std::wstring file = dir + L"\\joincode.txt";
+    if (cmd == "savecode" && s.args.size() > 1 && s.args[1] == "clear")
+    {
+      DeleteFileW(file.c_str());
+      return Poll::Done;
+    }
     if (cmd == "savecode")
     {
       std::string code = net::tailcat::code();
@@ -1537,7 +1542,6 @@ Poll run(const Step& s, bool begin, std::string& why)
     if (code.empty() || !box)
       return Poll::Wait;
     cegui::text(box, code);
-    DeleteFileW(file.c_str());
     why = "code in the join box";
     return Poll::Done;
   }
