@@ -371,35 +371,36 @@ static std::string sessionStatus()
     std::string lan = net::upnp::localAddressText();
     std::string pub = net::upnp::publicAddress();
     net::upnp::Status u = net::upnp::status();
-    std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s).", g_session.playerCount());
+    int players = g_session.playerCount();
+    std::snprintf(b, sizeof(b), "Hosting, %d player%s.", players, players == 1 ? "" : "s");
     std::string line = b;
-    // The join code (the easy way): it needs nothing from either router.
+    // First line: the join code (the easy way; it needs nothing from either router).
     switch (net::tailcat::state())
     {
     case net::tailcat::State::Ready:
-      line += " Join code: friends paste it into Join Co-op, no router setup needed.";
+      line += " Send friends the join code: they paste it into Join Co-op. No router setup needed.";
       break;
     case net::tailcat::State::Starting:
       line += " Getting a join code...";
       break;
     case net::tailcat::State::Failed:
-      line += " " + codeStatus() + ".";
+      line += " " + codeStatus() + ", but friends can still join by IP.";
       break;
     default:
       break;
     }
-    // The IP route: the local address, and what the router needs for the public one.
-    line += " By IP:";
+    // Second line: joining by IP instead.
+    line += "\nOr join by IP: ";
     if (!lan.empty())
-      line += " " + lan + ":" + port + " on your network;";
+      line += lan + ":" + port + " on your network. ";
     if (pub.empty())
-      line += " finding your internet address...";
+      line += "Finding your internet address...";
     else if (u.state == net::upnp::State::Working)
-      line += " opening the port on your router...";
+      line += "Opening the port on your router...";
     else if (u.state == net::upnp::State::Open)
-      line += " over the internet, your router has the port open.";
+      line += "Over the internet, your router's port is open.";
     else
-      line += " over the internet, UDP " + port + " may need forwarding to this PC on your router.";
+      line += "Over the internet, you may need to forward UDP port " + port + ".";
     return line;
   }
   if (g_session.isReconnecting())

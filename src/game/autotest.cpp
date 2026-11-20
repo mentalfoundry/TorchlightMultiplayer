@@ -1510,6 +1510,16 @@ Poll run(const Step& s, bool begin, std::string& why)
     why = b;
     return Poll::Done;
   }
+  if (cmd == "resize" && s.args.size() > 2)
+  {
+    // Test only: resize the game window (outer size, pixels), as a player dragging its border would.
+    if (!g_window)
+      EnumWindows(findWindow, 0);
+    if (!g_window)
+      return Poll::Wait;
+    SetWindowPos(g_window, nullptr, 0, 0, intArg(s, 1), intArg(s, 2), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    return Poll::Done;
+  }
   if (cmd == "tailcat" && s.args.size() > 1)
   {
     // Test only: join codes on for this run (they reach Tailscale's public relays).

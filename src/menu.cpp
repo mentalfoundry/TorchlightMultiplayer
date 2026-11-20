@@ -36,6 +36,11 @@ constexpr const char* kPaste = "TLMP_Paste";
 
 static bool g_joining = false; // the address box is open
 
+// What our windows were last given, to skip unchanged updates. Reset by build(): the game rebuilds its
+// GUI (e.g. when the window is resized), destroying ours, and the new ones start out blank.
+static std::string g_shownStatus, g_shownInvite;
+static bool g_shownInSession = false;
+
 static void build(void* parent)
 {
   // On the Continue button's row, in the two free spots to its left.
@@ -79,6 +84,9 @@ static void build(void* parent)
     api.setVisible(b, false);
   if (void* b = make(parent, "GuiLook/StandardButton", kPaste, "{{.5,-1},{1,-140}}", "{{0,120},{0,44}}", "Paste"))
     api.setVisible(b, false);
+  g_shownStatus.clear();
+  g_shownInvite.clear();
+  g_shownInSession = false; // the Host button starts out as "Host Co-op", Join visible
   TLMP_LOG("menu: co-op buttons added to the title screen");
 }
 
@@ -215,18 +223,17 @@ void tick()
   bool inSession = g_actions.inSession && g_actions.inSession();
   if (void* s = windowNamed(kStatus))
   {
-    static std::string last;
     std::string now = g_joining ? "Co-op: paste (Ctrl+V) the host's join code, or type their address (IP, or "
                                   "IP:port), then Connect"
                                 : g_actions.status ? g_actions.status() : "";
-    if (now != last)
+    if (now != g_shownStatus)
     {
-      last = now;
+      g_shownStatus = now;
       text(s, now);
     }
   }
-  // Inviting friends: "Friends join with your code or at <IP>", then Copy code and Copy IP side by
-  // side. (While the code is being made, or if there is none, the status line below says so.)
+  // Inviting friends: "Invite friends:", then Copy code and Copy IP side by side. (The status line
+  // below says what each is for, and whether the code is still being made.)
   std::string address = g_actions.joinAddress ? g_actions.joinAddress() : "";
   std::string code = g_actions.joinCode ? g_actions.joinCode() : "";
   bool showCode = !code.empty() && !g_joining;
@@ -235,14 +242,12 @@ void tick()
   void* copyIp = windowNamed(kCopy);
   if (void* s = windowNamed(kJoinAt))
   {
-    static std::string last;
-    std::string now = showCode && showIp ? "Friends join with your code or at " + address
-                      : showCode         ? std::string("Friends join with your code")
-                      : showIp           ? "Friends join at " + address
-                                         : std::string();
-    if (now != last)
+    std::string now = showCode || showIp ? "Invite friends:" : "";
+    // (The buttons depend on which are shown, not only on the text.)
+    std::string key = now + (showCode ? "|code" : "") + (showIp ? "|ip" : "");
+    if (key != g_shownInvite)
     {
-      last = now;
+      g_shownInvite = key;
       text(s, now);
       // The buttons right after the text (its width in this font, at this screen size).
       float width = static_cast<float>(now.size()) * 9.5f;
@@ -299,10 +304,9 @@ void tick()
   }
   if (!g_joining)
   {
-    static bool shownInSession = false;
-    if (inSession != shownInSession)
+    if (inSession != g_shownInSession)
     {
-      shownInSession = inSession;
+      g_shownInSession = inSession;
       text(host, inSession ? "Leave Co-op" : "Host Co-op");
       if (void* j = windowNamed(kJoin))
         api.setVisible(j, !inSession);

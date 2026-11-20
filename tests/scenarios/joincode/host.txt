@@ -5,7 +5,14 @@ tailcat on
 wait 4
 clickslow TLMP_HostButton timeout=60
 expect tailcat ready timeout=60
-expect windowtext TLMP_JoinAt Friends join with your code timeout=10
+expect windowtext TLMP_JoinAt Invite friends: timeout=10
+# Resizing the window rebuilds the game's GUI (ours with it): everything must come back.
+resize 900 700
+wait 3
+resize 1040 808
+wait 3
+expect windowtext TLMP_JoinAt Invite friends: timeout=10
+expect windowtext TLMP_HostButton Leave Co-op timeout=10
 savecode timeout=10
 players 2 timeout=120
 savecode clear
