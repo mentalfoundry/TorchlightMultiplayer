@@ -366,23 +366,40 @@ static std::string sessionStatus()
     return "Co-op: not in a session (TLMP " TLMP_VERSION ")";
   if (g_session.isHost())
   {
-    // The address friends join at has its own big line (menu joinAddress); this one has the rest.
+    // How friends join has its own big line (menu joinAddress, joinCode); this one explains.
     std::string port = std::to_string(g_config.port);
     std::string lan = net::upnp::localAddressText();
     std::string pub = net::upnp::publicAddress();
     net::upnp::Status u = net::upnp::status();
     std::snprintf(b, sizeof(b), "Co-op: hosting, %d player(s).", g_session.playerCount());
     std::string line = b;
-    if (net::tailcat::state() != net::tailcat::State::Ready && !codeStatus().empty())
-      line += " " + codeStatus() + (net::tailcat::state() == net::tailcat::State::Failed ? "." : "");
-    if (pub.empty())
-      line += " Finding your internet address...";
+    // The join code (the easy way): it needs nothing from either router.
+    switch (net::tailcat::state())
+    {
+    case net::tailcat::State::Ready:
+      line += " Join code: friends paste it into Join Co-op, no router setup needed.";
+      break;
+    case net::tailcat::State::Starting:
+      line += " Getting a join code...";
+      break;
+    case net::tailcat::State::Failed:
+      line += " " + codeStatus() + ".";
+      break;
+    default:
+      break;
+    }
+    // The IP route: the local address, and what the router needs for the public one.
+    line += " By IP:";
     if (!lan.empty())
-      line += " Friends on your network: " + lan + ":" + port + ".";
-    if (u.state == net::upnp::State::Working)
-      line += " Opening the port on your router...";
-    else if (u.state != net::upnp::State::Open && !pub.empty())
-      line += " If friends can't connect by IP, forward UDP " + port + " to this PC on your router.";
+      line += " " + lan + ":" + port + " on your network;";
+    if (pub.empty())
+      line += " finding your internet address...";
+    else if (u.state == net::upnp::State::Working)
+      line += " opening the port on your router...";
+    else if (u.state == net::upnp::State::Open)
+      line += " over the internet, your router has the port open.";
+    else
+      line += " over the internet, UDP " + port + " may need forwarding to this PC on your router.";
     return line;
   }
   if (g_session.isReconnecting())
