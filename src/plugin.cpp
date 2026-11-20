@@ -398,9 +398,9 @@ static std::string sessionStatus()
     else if (u.state == net::upnp::State::Working)
       line += "Opening the port on your router...";
     else if (u.state == net::upnp::State::Open)
-      line += "Over the internet, your router's port is open.";
+      line += "Your router's port is open.";
     else
-      line += "Over the internet, you may need to forward UDP port " + port + ".";
+      line += "You may need to forward UDP port " + port + ".";
     return line;
   }
   if (g_session.isReconnecting())
